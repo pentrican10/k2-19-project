@@ -7,17 +7,43 @@ import os
 import batman
 from scipy.stats import norm
 from scipy.optimize import minimize
+from scipy.optimize import root_scalar
 
-# Download the light curve data
+### Download the light curve data
 lc = lk.search_lightcurve("K2-19",author = 'SPOC').download_all()
 
-# Flatten the light curve
+### Flatten the light curve
 lc = lc.stitch().flatten(window_length=901).remove_outliers()
+
+### Create array of periods to search
+period = np.linspace(1, 20, 10000)
+### Create a BLSPeriodogram
+bls = lc.to_periodogram(method='bls', period=period, frequency_factor=500)
+### exctract period and t0
+planet_b_period = bls.period_at_max_power
+planet_b_t0 = bls.transit_time_at_max_power
+
+### initialize guess times
+transit_num = [0,2,3,4,5,6,93,95]
+tc_guess=[]
+for num in transit_num:
+    t = planet_b_t0.value + (num * planet_b_period.value)
+    tc_guess.append(t)
 #lc.plot()
 #plt.show()
-time = np.array(lc.time.value)
+time_tess = np.array(lc.time.value)
 flux=np.array(lc.flux)
 flux_err = np.array(lc.flux_err)
+
+def convert_time(times):
+    ### TESS offset 
+    BTJD = times + 2457000
+    new_time = BTJD - 2454833
+    return new_time
+
+
+time = convert_time(time_tess)
+tc_guess = convert_time(np.array(tc_guess))
 
 #'''
 #plt.scatter(time, flux)
@@ -61,8 +87,9 @@ num_c = 2
 
 #tc1 = np.linspace(time.min(),2600, 100)
 ttv_min= 0.00694444
-ttv_hour = 6* 0.0416667 # 1 hour to days
-tc_guess = (2530.2, 2546, 2554, 2562, 2570, 2577.8, 3266.8, 3282.7)
+### set range for search: [#hours] * [days per hour]
+ttv_hour = 2* 0.0416667 # 1 hour to days
+#tc_guess = (2530.28, 2546.12, 2554.04, 2561.96, 2569.88, 2577.8, 3266.84, 3282.68)
 #t1 guess
 ### get tc ranges 
 tc = []
@@ -74,6 +101,7 @@ for i in range(len(tc_guess)):
 
 
 tc_chi = np.zeros(len(tc))
+errors = []
 ### plot X^2 vs tc for each guess
 for j in range(len(tc)):
     tc1 = tc[j]
@@ -105,15 +133,38 @@ for j in range(len(tc)):
 
     #print(chi_sq)
     min_chi_idx = tc1[np.argmin(chi_sq)]
+    min_chi = chi_sq.min()
     tc_chi[j] = min_chi_idx
+
+    ### delta chisq = 1 gives errors
+    err_threshold = min_chi + 1
+    # Find the intersection points
+    def intersection_func(t):
+        return np.interp(t, tc1, chi_sq) - err_threshold
+    
+    # Find the intersection using root_scalar
+    intersections = []
+    for k in range(len(tc1) - 1):
+        if (chi_sq[k] - err_threshold) * (chi_sq[k + 1] - err_threshold) < 0:
+            sol = root_scalar(intersection_func, bracket=[tc1[k], tc1[k + 1]])
+            if sol.converged:
+                intersections.append((sol.root - min_chi_idx))
+    errors.append(intersections)
+    
     plt.plot(tc1, chi_sq,label='chisq')
     plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
     plt.axvline(x=min_chi_idx, color='green', linestyle='--', label='Chisq min')
+    # for inter in intersections:
+    #     plt.axvline(x=inter, color='blue', linestyle='--')
+    plt.axhline(y=err_threshold, color='purple', linestyle='--', label='Error Threshold')
     plt.title(f'Transit {j+1}: Planet b')
     plt.xlabel('tc')
     plt.ylabel('X^2')
     plt.legend()
     plt.show()
+
+print(tc_chi)
+print(errors)
 
 
 
