@@ -1,0 +1,11 @@
+plt.plot(tc1, chi_sq,label='chisq')
+    # plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
+    # plt.axvline(x=min_chi_time, color='green', linestyle='--', label='Chisq min')
+    # # for inter in intersections:
+    # #     plt.axvline(x=inter, color='blue', linestyle='--')
+    # plt.axhline(y=err_threshold, color='purple', linestyle='--', label='Error Threshold')
+    # plt.title(f'Transit {j+1}: Planet b')
+    # plt.xlabel('tc')
+    # plt.ylabel('X^2')
+    # plt.legend()
+    # plt.show()

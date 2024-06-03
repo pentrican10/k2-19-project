@@ -82,6 +82,7 @@ planet_c_dur = bls.duration_at_max_power
 
 # Check the value for period
 print(planet_c_period)
+print(planet_c_t0)
 
 ax = masked_lc.fold(planet_c_period, planet_c_t0).scatter()
 masked_lc.fold(planet_c_period, planet_c_t0).bin(.1).plot(ax=ax, c='r', lw=2,
