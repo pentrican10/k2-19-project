@@ -47,6 +47,7 @@ planet_b_dur = bls.duration_at_max_power
 # Check the value for period
 print(f'Period: {planet_b_period}')
 print(f'tc: {planet_b_t0}')
+print(f'duration: {planet_b_dur}')
 
 ax = lc.fold(period=planet_b_period, epoch_time=planet_b_t0).scatter()
 ax.set_xlim(-5, 5)
@@ -83,7 +84,8 @@ planet_c_dur = bls.duration_at_max_power
 # Check the value for period
 print(planet_c_period)
 print(planet_c_t0)
-
+print(planet_c_dur)
+assert 1==0
 ax = masked_lc.fold(planet_c_period, planet_c_t0).scatter()
 masked_lc.fold(planet_c_period, planet_c_t0).bin(.1).plot(ax=ax, c='r', lw=2,
                                                           label='Binned Flux')

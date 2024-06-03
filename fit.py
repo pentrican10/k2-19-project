@@ -65,32 +65,25 @@ print(f'TC(paper): {pl_c.Tc.values}')
 print(f'TTV from ephem: {paper_ttv_c}')
 #assert 1==0
 
-
-
-
 ### Download the light curve data
 lc = lk.search_lightcurve("K2-19",author = 'SPOC').download_all()
 
 ### Flatten the light curve
 lc = lc.stitch().flatten(window_length=901).remove_outliers()
 
-### Create array of periods to search
-period = np.linspace(1, 20, 10000)
-### Create a BLSPeriodogram
-bls = lc.to_periodogram(method='bls', period=period, frequency_factor=500)
-### exctract period and t0
-planet_b_period = bls.period_at_max_power
-planet_b_t0 = bls.transit_time_at_max_power
+
+### from BLS in k2-19_project.py
+planet_b_period = 7.9204920492049204
+planet_b_t0 = 2530.2807708159753
 print(f'Period(BLS): {planet_b_period}')
 print(f'Tc(BLS): {planet_b_t0}')
-#print(planet_b_period)
-#assert 1==0
+
 ### initialize guess times
 transit_num = [0,2,3,4,5,6,93,95]
 
 tc_guess=[]
 for num in transit_num:
-    t = planet_b_t0.value + (num * planet_b_period.value)
+    t = planet_b_t0 + (num * planet_b_period)
     tc_guess.append(t)
 
 # ## num with paper ephem
@@ -243,7 +236,7 @@ print(f'TTV(TESS): {ttv}')
 
 plt.scatter(tc_chi, ttv)
 plt.scatter(pl_b.Tc.values, paper_ttv_b)
-plt.scatter(pl_c.Tc.values, paper_ttv_c)
+#plt.scatter(pl_c.Tc.values, paper_ttv_c)
 
 plt.title(f'TTV Paper: Planet b')
 plt.xlabel('tc')

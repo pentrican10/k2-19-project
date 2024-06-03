@@ -32,8 +32,8 @@ df = read_table(file)
 
 ### generate ttv (lin ephem from params in table 3)
 ### planet c
-p_c = 11.8993
-tc_c = 2020.0007
+p_c = 11.881982213238517 #11.8993   from linear regression
+tc_c = 2021.6596526681883 #2020.0007
 transit_c = [84, 99]
 predicted_time_c=[]
 for i in transit_c:
@@ -53,27 +53,11 @@ lc = lk.search_lightcurve("K2-19",author = 'SPOC').download_all()
 ### Flatten the light curve
 lc = lc.stitch().flatten(window_length=901).remove_outliers()
 
-### Create array of periods to search
-period = np.linspace(1, 20, 10000)
-### Create a BLSPeriodogram
-bls = lc.to_periodogram(method='bls', period=period, frequency_factor=500)
-### exctract period and t0
-planet_b_period = bls.period_at_max_power
-planet_b_t0 = bls.transit_time_at_max_power
-planet_b_dur = bls.duration_at_max_power
 
-# print(f'Period(BLS): {planet_b_period}')
-# print(f'Tc(BLS): {planet_b_t0}')
-
-planet_b_mask = bls.get_transit_mask(period=planet_b_period,
-                                     transit_time=planet_b_t0,
-                                     duration=planet_b_dur)
-masked_lc = lc[~planet_b_mask]
-period = np.linspace(1, 300, 10000)
-bls = masked_lc.to_periodogram('bls', period=period, frequency_factor=500)
-planet_c_period = bls.period_at_max_power
-planet_c_t0 = bls.transit_time_at_max_power
-planet_c_dur = bls.duration_at_max_power
+### from BLS in k2-19_project.py
+planet_c_period = 101.53385338533853
+planet_c_t0 = 2553.160770815975
+planet_c_dur =0.2
 print(f'Period(BLS) c: {planet_c_period}')
 print(f'Tc(BLS) c: {planet_c_t0}')
 
@@ -83,10 +67,10 @@ transit_num = [0,7]
 
 tc_guess=[]
 for num in transit_num:
-    t = planet_c_t0.value + (num * planet_c_period.value)
+    t = planet_c_t0 + (num * planet_c_period)
     tc_guess.append(t)
 # ## num with paper ephem
-t_num_paper_c = [45,105]
+t_num_paper_c = [227,287]
 
 
 time_tess = np.array(lc.time.value)
@@ -99,12 +83,11 @@ def convert_time(times):
     new_time = BTJD - 2454833
     return new_time
 
-
+print(tc_guess)
 time = convert_time(time_tess)
 tc_guess = convert_time(np.array(tc_guess))
 tc_guess = np.array(tc_guess)
 print(f'TC guess(TESS): {tc_guess}')
-
 
 per_c = 11.8993
 rp_c = 0.0458
