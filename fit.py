@@ -140,7 +140,7 @@ def omc(obs_time, t_num, p, tc):
 #tc1 = np.linspace(time.min(),2600, 100)
 ttv_min= 0.00694444
 ### set range for search: [#hours] * [days per hour]
-ttv_hour = 2* 0.0416667 # 1 hour to days
+ttv_hour = 6* 0.0416667 # 1 hour to days
 #tc_guess = (2530.28, 2546.12, 2554.04, 2561.96, 2569.88, 2577.8, 3266.84, 3282.68)
 
 ### get tc ranges 
@@ -208,17 +208,17 @@ for j in range(len(tc)):
                 intersections.append((sol.root - min_chi_time))
     errors.append(intersections)
     
-    # plt.plot(tc1, chi_sq,label='chisq')
-    # plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
-    # plt.axvline(x=min_chi_time, color='green', linestyle='--', label='Chisq min')
-    # # for inter in intersections:
-    # #     plt.axvline(x=inter, color='blue', linestyle='--')
-    # plt.axhline(y=err_threshold, color='purple', linestyle='--', label='Error Threshold')
-    # plt.title(f'Transit {j+1}: Planet b')
-    # plt.xlabel('tc')
-    # plt.ylabel('X^2')
-    # plt.legend()
-    # plt.show()
+    plt.plot(tc1, chi_sq,label='chisq')
+    plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
+    plt.axvline(x=min_chi_time, color='green', linestyle='--', label='Chisq min')
+    # for inter in intersections:
+    #     plt.axvline(x=inter, color='blue', linestyle='--')
+    plt.axhline(y=err_threshold, color='purple', linestyle='--', label='Error Threshold')
+    plt.title(f'Transit {j+1}: Planet b')
+    plt.xlabel('tc')
+    plt.ylabel('X^2')
+    plt.legend()
+    plt.show()
 
 print(f'Transit Times(TESS): {tc_chi}')
  
