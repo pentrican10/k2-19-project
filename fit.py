@@ -30,6 +30,22 @@ def read_table(file_name):
 
 df = read_table(file)
 
+### params from exoplanet archive
+per_b = 7.9222
+rp_b = 0.0777
+T14_b = 3.237 * 0.0416667  # convert to days
+b_b = 0.17
+q1_b = 0.4
+q2_b = 0.3
+
+per_c = 11.8993
+rp_c = 0.0458
+T14_c = 3.823 * 0.0416667
+b_c = 0.630
+q1_c = 0.4
+q2_c = 0.3
+
+
 ### generate ttv (lin ephem from params in table 3)
 p_b = 7.920925490169578   ### used linear regression, changed the slope to the one extracted original paper value 7.9222
 tc_b = 2027.9158659031389 ###2027.9023
@@ -67,9 +83,17 @@ print(f'TTV from ephem: {paper_ttv_c}')
 
 ### Download the light curve data
 lc = lk.search_lightcurve("K2-19",author = 'SPOC').download_all()
+lc = lc.stitch()
+### plot this without flatten, mask transit times before flattening
+transit_times = [4697.28834658, 4713.12428017, 4721.03972171, 4728.96021376, 4736.88070581, 4744.79614735, 5433.87895563, 5449.71993973]
+masked_lc = lc
+for transit_time in transit_times:
+    masked_lc = masked_lc[(masked_lc.time.value > transit_time - T14_b/2) | (masked_lc.time.value < transit_time + T14_b/2)]
+
+
 
 ### Flatten the light curve
-lc = lc.stitch().flatten(window_length=901).remove_outliers()
+masked_lc = masked_lc.flatten(window_length=901).remove_outliers()
 
 
 ### from BLS in k2-19_project.py
@@ -95,9 +119,9 @@ t_num_paper_c = []
 #     tc_guess.append(t)
 
 
-time_tess = np.array(lc.time.value)
-flux=np.array(lc.flux)
-flux_err = np.array(lc.flux_err)
+time_tess = np.array(masked_lc.time.value)
+flux=np.array(masked_lc.flux)
+flux_err = np.array(masked_lc.flux_err)
 
 def convert_time(times):
     ### TESS offset 
@@ -110,27 +134,8 @@ time = convert_time(time_tess)
 tc_guess = convert_time(np.array(tc_guess))
 tc_guess = np.array(tc_guess)
 print(f'TC guess(TESS): {tc_guess}')
-#assert 1==0
 
 
-
-### params from exoplanet archive
-per_b = 7.9222
-rp_b = 0.0777
-T14_b = 3.237 * 0.0416667  # convert to days
-b_b = 0.17
-q1_b = 0.4
-q2_b = 0.3
-
-per_c = 11.8993
-rp_c = 0.0458
-T14_c = 3.823 * 0.0416667
-b_c = 0.630
-q1_c = 0.4
-q2_c = 0.3
-### number of transits for planet b
-num_b = 8
-num_c = 2
 
 def omc(obs_time, t_num, p, tc):
     calc_time = tc + (t_num* p)
@@ -247,9 +252,52 @@ plt.show()
 
 
 
+tc_test = tc_chi
+for i in range(len(tc_test)):
+    start = tc_test[i] - (72* 0.0416667)
+    end = tc_test[i] + (72* 0.0416667)
+    # start = tc_test[1] - (24* 0.0416667)
+    # end = tc_test[1] + (24* 0.0416667)
+    mask = (time > (start)) & (time < (end))
 
+    theta_initial = [tc_test[i], p_b, rp_b, b_b, T14_b, q1_b, q2_b]
+    ### initialize params
+    params = batman.TransitParams()
+    params.t0, params.per, params.rp,params.b, params.T14, q1, q2 = theta_initial
+    params.u = [2*np.sqrt(q1)*q2, np.sqrt(q1)*(1-2*q2)]  # Limb darkening coefficients
+    params.limb_dark = 'quadratic'
+                
+    transit_model = batman.TransitModel(params, time[mask])
+                
+    # Generate model light curve
+    model_flux = transit_model.light_curve(params)
 
+    # Binning function
+    def bin_photometry(time, flux, bin_size):
+        bins = np.arange(time.min(), time.max(), bin_size)
+        digitized = np.digitize(time, bins)
+        binned_time = []
+        binned_flux = []
+        for i in range(1, len(bins)):
+            bin_mask = digitized == i
+            if bin_mask.any():
+                binned_time.append(time[bin_mask].mean())
+                binned_flux.append(flux[bin_mask].mean())
+        return np.array(binned_time), np.array(binned_flux)
 
+    # Bin the data
+    bin_size = 0.04  # Define bin size
+    binned_time, binned_flux = bin_photometry(time[mask], flux[mask], bin_size)
+
+    # Plot binned data and photometry and model
+    plt.scatter(time[mask],flux[mask], s=10,label='data')
+    plt.plot(time[mask], model_flux, color='red',label='model')
+    plt.scatter(binned_time, binned_flux, color='orange', s=15, label='Binned Data')
+    plt.title(f'transit {i+1}')
+    plt.xlabel('transit time (days)')
+    plt.ylabel('flux')
+    plt.legend()
+    plt.show()
 
 
 
