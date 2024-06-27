@@ -45,6 +45,13 @@ b_c = 0.630
 q1_c = 0.4
 q2_c = 0.3
 
+def convert_time(times):
+    ### TESS offset 
+    BTJD = times + 2457000
+    new_time = BTJD - 2454833
+    return new_time
+
+
 
 ### generate ttv (lin ephem from params in table 3)
 p_b = 7.920925490169578   ### used linear regression, changed the slope to the one extracted original paper value 7.9222
@@ -85,21 +92,18 @@ print(f'TTV from ephem c: {paper_ttv_c}')
 lc = lk.search_lightcurve("K2-19",author = 'SPOC').download_all()
 lc = lc.stitch()
 ### plot this without flatten, mask transit times before flattening
-transit_times = [4697.28834658, 4713.12428017, 4721.03972171, 4728.96021376, 4736.88070581, 4744.79614735, 5433.87895563, 5449.71993973]
+#transit_times = [4697.28834658, 4713.12428017, 4721.03972171, 4728.96021376, 4736.88070581, 4744.79614735, 5433.87895563, 5449.71993973]
+transit_times = [4697.28834658, 4713.12933068, 4721.03972171, 4728.96021376, 4736.88070581, 4744.80119786, 5433.87895563, 5449.71993973]
 masked_lc = lc
-# for transit_time in transit_times:
-#     mask = (masked_lc.time.value > (transit_time - T14_b/2)) | (masked_lc.time.value < (transit_time + T14_b/2))
-#     masked_lc_ = masked_lc[mask]
-#     masked_lc = masked_lc_
 
+times = convert_time(masked_lc.time.value)
 
 # Initialize a mask with all True values (i.e., include all data points initially)
-mask = np.zeros_like(masked_lc.time.value, dtype=bool)
+mask = np.zeros_like(times, dtype=bool)
 
 # Iterate through each transit time and update the mask
 for transit_time in transit_times:
-    mask &= (masked_lc.time.value > (transit_time - T14_b/2)) | (masked_lc.time.value < (transit_time + T14_b/2))
-#masked_lc = masked_lc[mask]
+    mask |= (times > (transit_time - T14_b/2)) & (times < (transit_time + T14_b/2))
 
 ### Flatten the light curve
 masked_lc = masked_lc.flatten(window_length=901, mask=mask).remove_outliers()
@@ -124,21 +128,11 @@ for num in transit_num:
 # ## num with paper ephem
 t_num_paper = [337,339,340,341,342,343,430,432]
 t_num_paper_c = []
-# tc_guess=[]
-# for num in transit_num:
-#     t = tc_b + (num * p_b)
-#     tc_guess.append(t)
 
 
 time_tess = np.array(masked_lc.time.value)
 flux=np.array(masked_lc.flux)
 flux_err = np.array(masked_lc.flux_err)
-
-def convert_time(times):
-    ### TESS offset 
-    BTJD = times + 2457000
-    new_time = BTJD - 2454833
-    return new_time
 
 
 time = convert_time(time_tess)
@@ -375,20 +369,3 @@ def log_likelihood(theta, x, y, yerr):
 
 '''
 
-
-
-
-
-
-# nll = lambda *args: -log_likelihood(*args)
-# soln = minimize(nll, theta_initial, args=(time, flux, flux_err))
-# t0, per, rp, b, T14, q1, q2 = soln.x
-
-# print("Maximum likelihood estimates:")
-# print("t0 = {0:.3f}".format(t0))
-# print("per = {0:.3f}".format(per))
-# print("rp = {0:.3f}".format(rp))
-# print("b = {0:.3f}".format(b))
-# print("T14 = {0:.3f}".format(T14))
-
-#print(lg_like)

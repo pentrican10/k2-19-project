@@ -216,3 +216,30 @@ print(f'Linear regression Slope 1: {slope_1}')
 print(f'Linear regression Intercept 1: {intercept_1}')
 print(f'Linear regression Slope 2: {slope_2}')
 print(f'Linear regression Intercept 2: {intercept_2}')
+
+
+### pairwise periods (difference in consecutive times)
+p_1 = np.zeros(len(t_1)-1)
+for i in range(len(p_1)):
+    p = t_1[i+1] - t_1[i]
+    p_1[i] = p
+
+p_2 = np.zeros(len(t_2)-1)
+for i in range(len(p_2)):
+    p = t_2[i+1] - t_2[i]
+    p_2[i] = p
+
+# Plot histogram 1
+plt.hist(p_1, bins='auto', edgecolor='black')
+plt.title('Histogram of p_1')
+plt.xlabel('Period 1')
+plt.ylabel('Frequency')
+plt.show()
+
+# Plot histogram 2
+plt.hist(p_2, bins='auto', edgecolor='black')
+plt.title('Histogram of p_2')
+plt.xlabel('Period 2')
+plt.ylabel('Frequency')
+plt.tight_layout()
+plt.show()
