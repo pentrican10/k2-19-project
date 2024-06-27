@@ -49,20 +49,20 @@ q2_c = 0.3
 ### generate ttv (lin ephem from params in table 3)
 p_b = 7.920925490169578   ### used linear regression, changed the slope to the one extracted original paper value 7.9222
 tc_b = 2027.9158659031389 ###2027.9023
-print(f'Period(paper): {p_b}')
-print(f'TC(paper): {tc_b}')
+print(f'Period(paper) b: {p_b}')
+print(f'TC(paper) b: {tc_b}')
 transit_b = [24,28,35,127,135,144]
 predicted_time = []
 for i in transit_b:
     ephem = tc_b + i* p_b
     predicted_time.append(ephem)
-print(f'Predicted times(ephem): {predicted_time}')
+print(f'Predicted times(ephem) b: {predicted_time}')
 
 # print(df.Tc)
 pl_b = df[df["Planet"] == "K2-19b"]
 paper_ttv_b = pl_b.Tc.values - predicted_time
-print(f'TC(paper): {pl_b.Tc.values}')
-print(f'TTV from ephem: {paper_ttv_b}')
+print(f'TC(paper) b: {pl_b.Tc.values}')
+print(f'TTV from ephem b: {paper_ttv_b}')
 #assert 1==0
 
 ### planet c
@@ -73,13 +73,13 @@ predicted_time_c=[]
 for i in transit_c:
     ephem = tc_c + i* p_c
     predicted_time_c.append(ephem)
-print(f'Predicted times(ephem): {predicted_time_c}')
+print(f'Predicted times(ephem) c: {predicted_time_c}')
 
 pl_c = df[df["Planet"] == "K2-19c"]
 paper_ttv_c = pl_c.Tc.values - predicted_time_c
-print(f'TC(paper): {pl_c.Tc.values}')
-print(f'TTV from ephem: {paper_ttv_c}')
-#assert 1==0
+print(f'TC(paper) c: {pl_c.Tc.values}')
+print(f'TTV from ephem c: {paper_ttv_c}')
+
 
 ### Download the light curve data
 lc = lk.search_lightcurve("K2-19",author = 'SPOC').download_all()
@@ -87,13 +87,24 @@ lc = lc.stitch()
 ### plot this without flatten, mask transit times before flattening
 transit_times = [4697.28834658, 4713.12428017, 4721.03972171, 4728.96021376, 4736.88070581, 4744.79614735, 5433.87895563, 5449.71993973]
 masked_lc = lc
+# for transit_time in transit_times:
+#     mask = (masked_lc.time.value > (transit_time - T14_b/2)) | (masked_lc.time.value < (transit_time + T14_b/2))
+#     masked_lc_ = masked_lc[mask]
+#     masked_lc = masked_lc_
+
+
+# Initialize a mask with all True values (i.e., include all data points initially)
+mask = np.zeros_like(masked_lc.time.value, dtype=bool)
+
+# Iterate through each transit time and update the mask
 for transit_time in transit_times:
-    masked_lc = masked_lc[(masked_lc.time.value > transit_time - T14_b/2) | (masked_lc.time.value < transit_time + T14_b/2)]
-
-
+    mask &= (masked_lc.time.value > (transit_time - T14_b/2)) | (masked_lc.time.value < (transit_time + T14_b/2))
+#masked_lc = masked_lc[mask]
 
 ### Flatten the light curve
-masked_lc = masked_lc.flatten(window_length=901).remove_outliers()
+masked_lc = masked_lc.flatten(window_length=901, mask=mask).remove_outliers()
+
+
 
 
 ### from BLS in k2-19_project.py
@@ -213,17 +224,17 @@ for j in range(len(tc)):
                 intersections.append((sol.root - min_chi_time))
     errors.append(intersections)
     
-    plt.plot(tc1, chi_sq,label='chisq')
-    plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
-    plt.axvline(x=min_chi_time, color='green', linestyle='--', label='Chisq min')
-    # for inter in intersections:
-    #     plt.axvline(x=inter, color='blue', linestyle='--')
-    plt.axhline(y=err_threshold, color='purple', linestyle='--', label='Error Threshold')
-    plt.title(f'Transit {j+1}: Planet b')
-    plt.xlabel('tc')
-    plt.ylabel('X^2')
-    plt.legend()
-    plt.show()
+    # plt.plot(tc1, chi_sq,label='chisq')
+    # plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
+    # plt.axvline(x=min_chi_time, color='green', linestyle='--', label='Chisq min')
+    # # for inter in intersections:
+    # #     plt.axvline(x=inter, color='blue', linestyle='--')
+    # plt.axhline(y=err_threshold, color='purple', linestyle='--', label='Error Threshold')
+    # plt.title(f'Transit {j+1}: Planet b')
+    # plt.xlabel('tc')
+    # plt.ylabel('X^2')
+    # plt.legend()
+    # plt.show()
 
 print(f'Transit Times(TESS): {tc_chi}')
  

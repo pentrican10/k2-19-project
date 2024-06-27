@@ -79,26 +79,26 @@ planet2 = models.Planet(
     mean_anomaly=-1.9584857031843157e+01,
 )
 '''
+
 planets = [planet1, planet2]
 Time = -1045                        # days
 dt = 0.1                                      # days
 Total = 1700                        # days
 N_step = int((Total-Time) / dt)
-print(N_step)
 
+### Results dictionary
 results = ttvfast.ttvfast(planets, stellar_mass, Time, dt, Total)
 
-# Extract necessary data from the results
+### Extract necessary data from the results
 planet_ind = np.array(results['positions'][0])
 epoch_int = np.array(results['positions'][1])   #transit number
 times_ = (np.array(results['positions'][2]))
 rsky_values = np.array(results['positions'][3])
 vsky_values = np.array(results['positions'][4])
-print((times_[planet_ind==0]))
+
 ### finding index where the time values end and -2. fills rest of array
 time_end = np.where(times_ == -2.)[0][0]
-print(time_end)
-print(results['positions'][2])
+
 
 '''
 # ### Reverse the array
@@ -118,43 +118,82 @@ epoch_int = epoch_int[:time_end]
 times_= times_[:time_end]
 rsky_values = rsky_values[:time_end]
 vsky_values = vsky_values[:time_end]
-print((results['positions'][0])[:time_end])
 
-
-
-
-### using hacky np.diff way
+### separate by planet 
 t_1 = times_[planet_ind==0]
-t_1_aligned = t_1[1:]  # align with the np.diff calculation because it shortened the array (disregard first time)
-ttv1 = np.diff(t_1) - np.mean(np.diff(t_1))
-period_h1 = np.mean(np.diff(t_1))
-plt.scatter(t_1_aligned, ttv1, label='planet 1',color='orange')
-
 t_2 = times_[planet_ind==1]
-t_2_aligned = t_2[1:]
-ttv2 = np.diff(t_2) - np.mean(np.diff(t_2))
-period_h2 = np.mean(np.diff(t_2))
-plt.scatter(t_2_aligned, ttv2, label='planet 2', color='blue')
+epoch_1 = epoch_int[planet_ind==0]
+epoch_2 = epoch_int[planet_ind==1]
+rsky_values_1 = rsky_values[planet_ind==0]
+rsky_values_2 = rsky_values[planet_ind==1]
+vsky_values_1 = vsky_values[planet_ind==0]
+vsky_values_2 = vsky_values[planet_ind==1]
+
+### re-indexing about center data point
+half_t1 = int(((len(t_1))/2))
+half_t2 = int(((len(t_2))/2))
+epoch_1_ind = epoch_1 - half_t1
+epoch_2_ind = epoch_2 - half_t2
+
+
+
+### linear regression planet1
+X1 = epoch_1_ind
+y1 = t_1
+
+# Fit the model using numpy.polyfit
+slope_1, intercept_1 = np.polyfit(X1, y1, 1)
+
+# Predict the y values
+y_pred1 = slope_1 * X1 + intercept_1
+
+# Calculate residuals
+residuals1 = y1 - y_pred1
+
+
+### linear regression planet2
+X2 = epoch_2_ind
+y2 = t_2
+
+# Fit the model using numpy.polyfit
+slope_2, intercept_2 = np.polyfit(X2, y2, 1)
+
+# Predict y values (expected times)
+y_pred2 = slope_2 * X2 + intercept_2
+
+# Calculate residuals (omc)
+residuals2 = y2 - y_pred2
+
+### plot 
+plt.scatter(t_1,residuals1,color='orange',label='planet 1 lin')
+plt.scatter(t_2,residuals2,color='blue', label='planet 2 lin')
+plt.title("Linear Regression and hacky TTVs")
 plt.ylabel('TTV (days)')
 plt.xlabel('Time (days)')
-plt.title('Hacky TTV plots')
 plt.legend()
 plt.show()
+
+
 
 
 ### using ephem to calculate
 period_sim1 = planet1.period
 period_sim2 = planet2.period
-epoch_1 = epoch_int[planet_ind==0]
-epoch_2 = epoch_int[planet_ind==1]
 expected_time_1 = np.zeros(len(t_1))
 expected_time_2 = np.zeros(len(t_2))
-for i in range(len(epoch_1)):
-    expected_time1 =  -1040.9 + period_sim1 * epoch_1[i]
+# re-index and find intercept 
+for i in range(len(epoch_1_ind)):
+    expected_time1 =  period_sim1 * epoch_1_ind[i]
     expected_time_1[i] = expected_time1
-for i in range(len(epoch_2)):
-    expected_time2 =  -1039.1+ period_sim2 * epoch_2[i]
+for i in range(len(epoch_2_ind)):
+    expected_time2 =   period_sim2 * epoch_2_ind[i]
     expected_time_2[i] = expected_time2
+# for i in range(len(epoch_1_ind)):
+#     expected_time1 =  intercept_1 + slope_1 * epoch_1_ind[i]
+#     expected_time_1[i] = expected_time1
+# for i in range(len(epoch_2_ind)):
+#     expected_time2 =  intercept_2 + slope_2 * epoch_2_ind[i]
+#     expected_time_2[i] = expected_time2
 
 omc1 = t_1 - expected_time_1
 omc2 = t_2 - expected_time_2
@@ -167,107 +206,7 @@ plt.legend()
 plt.show()
 
 
-### linear regression
-X = epoch_1.reshape(-1,1)
-y=t_1
-# Create and fit the model
-model = LinearRegression()
-model.fit(X, y)
-
-# Get the coefficients
-slope_1 = model.coef_[0]
-intercept_1 = model.intercept_
-
-# Predict the y values
-y_pred1 = model.predict(X)
-
-# Calculate residuals
-residuals1 = y - y_pred1
-'''
-# Plot the original data and the fitted line
-# plt.figure(figsize=(12, 6))
-
-# plt.subplot(1, 2, 1)
-# plt.scatter(epoch_1, t_1, color='blue', label='Original data')
-# plt.plot(epoch_1, y_pred1, color='red', label='Fitted line')
-# plt.xlabel('Transit Index')
-# plt.ylabel('Transit Time')
-# plt.title('Original Data with Fitted Line')
-# plt.legend()
-
-# # Plot the residuals (detrended data)
-# plt.subplot(1, 2, 2)
-# plt.scatter(epoch_1, residuals1, color='green', label='Residuals')
-# plt.axhline(0, color='red', linestyle='--', label='Zero Line')
-# plt.xlabel('Transit Index')
-# plt.ylabel('Residuals (Detrended Transit Time)')
-# plt.title('Detrended Data')
-# plt.legend()
-
-# plt.tight_layout()
-# plt.show()
-'''
-
-
-### planet 2
-X = epoch_2.reshape(-1,1)
-y=t_2
-# Create and fit the model
-model = LinearRegression()
-model.fit(X, y)
-
-# Get the coefficients
-slope_2 = model.coef_[0]
-intercept_2 = model.intercept_
-
-# Predict the y values
-y_pred2 = model.predict(X)
-
-# Calculate residuals
-residuals2 = y - y_pred2
-'''
-# Plot the original data and the fitted line
-# plt.figure(figsize=(12, 6))
-
-# plt.subplot(1, 2, 1)
-# plt.scatter(epoch_2, t_2, color='blue', label='Original data')
-# plt.plot(epoch_2, y_pred2, color='red', label='Fitted line')
-# plt.xlabel('Transit Index')
-# plt.ylabel('Transit Time')
-# plt.title('Original Data with Fitted Line')
-# plt.legend()
-
-# # Plot the residuals (detrended data)
-# plt.subplot(1, 2, 2)
-# plt.scatter(epoch_2, residuals2, color='green', label='Residuals')
-# plt.axhline(0, color='red', linestyle='--', label='Zero Line')
-# plt.xlabel('Transit Index')
-# plt.ylabel('Residuals (Detrended Transit Time)')
-# plt.title('Detrended Data')
-# plt.legend()
-
-# plt.tight_layout()
-# plt.show()
-'''
-
-
-plt.scatter(t_1_aligned, ttv1, label='planet 1 hack',color='purple', s=2)
-plt.scatter(t_2_aligned, ttv2, label='planet 2 hack', color='black',s=2)
-plt.plot(t_1,residuals1,color='orange',label='planet 1 lin', lw=2)
-plt.plot(t_2,residuals2,color='blue', label='planet 2 lin',lw=2)
-plt.title("Linear Regression and hacky TTVs")
-plt.ylabel('TTV (days)')
-plt.xlabel('Time (days)')
-plt.legend()
-plt.show()
-
-
 ### slopes and intercepts 
-### hacky periods
-print('Periods from different methods:')
-print(f'Hacky period 1: {period_h1}')
-print(f'Hacky period 2: {period_h2}')
-
 ### simulation periods 
 print(f'Simulation period 1: {period_sim1}')
 print(f'Simulation period 2: {period_sim2}')
