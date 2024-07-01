@@ -167,7 +167,7 @@ residuals2 = y2 - y_pred2
 ### plot 
 plt.scatter(t_1,residuals1,color='orange',label='planet 1 lin')
 plt.scatter(t_2,residuals2,color='blue', label='planet 2 lin')
-plt.title("Linear Regression and hacky TTVs")
+plt.title("Linear Regression TTVs")
 plt.ylabel('TTV (days)')
 plt.xlabel('Time (days)')
 plt.legend()
@@ -218,28 +218,28 @@ print(f'Linear regression Slope 2: {slope_2}')
 print(f'Linear regression Intercept 2: {intercept_2}')
 
 
-### pairwise periods (difference in consecutive times)
-p_1 = np.zeros(len(t_1)-1)
-for i in range(len(p_1)):
-    p = t_1[i+1] - t_1[i]
-    p_1[i] = p
+# ### pairwise periods (difference in consecutive times)
+# p_1 = np.zeros(len(t_1)-1)
+# for i in range(len(p_1)):
+#     p = t_1[i+1] - t_1[i]
+#     p_1[i] = p
 
-p_2 = np.zeros(len(t_2)-1)
-for i in range(len(p_2)):
-    p = t_2[i+1] - t_2[i]
-    p_2[i] = p
+# p_2 = np.zeros(len(t_2)-1)
+# for i in range(len(p_2)):
+#     p = t_2[i+1] - t_2[i]
+#     p_2[i] = p
 
-# Plot histogram 1
-plt.hist(p_1, bins='auto', edgecolor='black')
-plt.title('Histogram of p_1')
-plt.xlabel('Period 1')
-plt.ylabel('Frequency')
-plt.show()
+# # Plot histogram 1
+# plt.hist(p_1, bins='auto', edgecolor='black')
+# plt.title('Histogram of p_1')
+# plt.xlabel('Period 1')
+# plt.ylabel('Frequency')
+# plt.show()
 
-# Plot histogram 2
-plt.hist(p_2, bins='auto', edgecolor='black')
-plt.title('Histogram of p_2')
-plt.xlabel('Period 2')
-plt.ylabel('Frequency')
-plt.tight_layout()
-plt.show()
+# # Plot histogram 2
+# plt.hist(p_2, bins='auto', edgecolor='black')
+# plt.title('Histogram of p_2')
+# plt.xlabel('Period 2')
+# plt.ylabel('Frequency')
+# plt.tight_layout()
+# plt.show()

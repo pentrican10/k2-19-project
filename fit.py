@@ -28,6 +28,24 @@ def read_table(file_name):
     df = df.dropna()
     return df
 
+def convert_time(times):
+    ### TESS offset 
+    BTJD = times + 2457000
+    new_time = BTJD - 2454833
+    return new_time
+
+def omc(obs_time, t_num, p, tc):
+    calc_time = tc + (t_num* p)
+    omc = obs_time - calc_time
+    return omc#*24 #days to hours
+
+### Find the intersection points
+def intersection_func(t): #masked
+    return np.interp(t, tc1, chi_sq) - err_threshold
+def intersection_func_lc(t): #unmasked
+    return np.interp(t, tc1, chi_sq_lc) - err_threshold_lc
+    
+
 df = read_table(file)
 
 ### params from exoplanet archive
@@ -43,14 +61,7 @@ rp_c = 0.0458
 T14_c = 3.823 * 0.0416667
 b_c = 0.630
 q1_c = 0.4
-q2_c = 0.3
-
-def convert_time(times):
-    ### TESS offset 
-    BTJD = times + 2457000
-    new_time = BTJD - 2454833
-    return new_time
-
+q2_c = 0.3  
 
 
 ### generate ttv (lin ephem from params in table 3)
@@ -65,12 +76,10 @@ for i in transit_b:
     predicted_time.append(ephem)
 print(f'Predicted times(ephem) b: {predicted_time}')
 
-# print(df.Tc)
 pl_b = df[df["Planet"] == "K2-19b"]
 paper_ttv_b = pl_b.Tc.values - predicted_time
 print(f'TC(paper) b: {pl_b.Tc.values}')
 print(f'TTV from ephem b: {paper_ttv_b}')
-#assert 1==0
 
 ### planet c
 p_c = 11.8993
@@ -98,17 +107,17 @@ masked_lc = lc
 
 times = convert_time(masked_lc.time.value)
 
-# Initialize a mask with all True values (i.e., include all data points initially)
+### Initialize a mask with all False values (i.e., include all data points initially)
 mask = np.zeros_like(times, dtype=bool)
 
-# Iterate through each transit time and update the mask
+### Iterate through each transit time and update the mask
 for transit_time in transit_times:
     mask |= (times > (transit_time - T14_b/2)) & (times < (transit_time + T14_b/2))
 
-### Flatten the light curve
+### Flatten the masked light curve
 masked_lc = masked_lc.flatten(window_length=901, mask=mask).remove_outliers()
-
-
+### flatten unmasked lightcurve 
+lc = lc.flatten(window_length=901).remove_outliers()
 
 
 ### from BLS in k2-19_project.py
@@ -125,29 +134,28 @@ for num in transit_num:
     t = planet_b_t0 + (num * planet_b_period)
     tc_guess.append(t)
 
-# ## num with paper ephem
+### transit num with paper ephem
 t_num_paper = [337,339,340,341,342,343,430,432]
 t_num_paper_c = []
 
-
+### masked data
 time_tess = np.array(masked_lc.time.value)
 flux=np.array(masked_lc.flux)
 flux_err = np.array(masked_lc.flux_err)
 
+### un-masked data
+time_tess_lc = np.array(lc.time.value)
+flux_lc=np.array(lc.flux)
+flux_err_lc = np.array(lc.flux_err)
 
 time = convert_time(time_tess)
+time_lc = convert_time(time_tess_lc)
 tc_guess = convert_time(np.array(tc_guess))
 tc_guess = np.array(tc_guess)
 print(f'TC guess(TESS): {tc_guess}')
 
 
 
-def omc(obs_time, t_num, p, tc):
-    calc_time = tc + (t_num* p)
-    omc = obs_time - calc_time
-    return omc#*24 #days to hours
-
-#tc1 = np.linspace(time.min(),2600, 100)
 ttv_min= 0.00694444
 ### set range for search: [#hours] * [days per hour]
 ttv_hour = 6* 0.0416667 # 1 hour to days
@@ -163,12 +171,16 @@ for i in range(len(tc_guess)):
 
 
 tc_chi = np.zeros(len(tc))
+tc_chi_lc = np.zeros(len(tc))
 ttv = np.zeros(len(tc))
+ttv_lc = np.zeros(len(tc))
 errors = []
+errors_lc = []
 ### plot X^2 vs tc for each guess
 for j in range(len(tc)):
     tc1 = tc[j]
     chi_sq = np.zeros(len(tc1))
+    chi_sq_lc = np.zeros(len(tc1))
     for i in range(len(tc1)):
         t0_b = 	tc1[i]
         theta_initial = [t0_b, per_b, rp_b, b_b, T14_b, q1_b, q2_b]
@@ -193,22 +205,38 @@ for j in range(len(tc)):
         chi_squared = np.sum(((flux[mask] - model_flux) / sigma2)**2)
         chi_sq[i] = (chi_squared)
 
+        ### repeat for the unmasked lc
+        mask_lc = (time_lc > (start)) & (time_lc < (end))
+        transit_model_lc = batman.TransitModel(params, time_lc[mask_lc])
+        model_flux_lc = transit_model_lc.light_curve(params)
+        sigma2_lc = flux_err_lc[mask_lc]
+        chi_squared_lc = np.sum(((flux_lc[mask_lc] - model_flux_lc) / sigma2_lc)**2)
+        chi_sq_lc[i] = (chi_squared_lc)
+
+
         
 
-    #print(chi_sq)
+    ### masked
     min_chi_time = tc1[np.argmin(chi_sq)]
     min_chi = chi_sq.min()
+
     tc_chi[j] = min_chi_time
     idx = t_num_paper[j]
     ttv[j] = omc(min_chi_time, idx, p_b, tc_b)#*24 #days to hours
-    #ttv[j] = omc 
+
+    ### unmasked
+    min_chi_time_lc = tc1[np.argmin(chi_sq_lc)]
+    min_chi_lc = chi_sq_lc.min()
+
+    tc_chi_lc[j] = min_chi_time_lc
+    idx_lc = t_num_paper[j]
+    ttv_lc[j] = omc(min_chi_time_lc, idx_lc, p_b, tc_b)#*24 #days to hours
+
 
     ### delta chisq = 1 gives errors
     err_threshold = min_chi + 1
-    # Find the intersection points
-    def intersection_func(t):
-        return np.interp(t, tc1, chi_sq) - err_threshold
-    
+    err_threshold_lc = min_chi_lc +1
+  
     # Find the intersection using root_scalar
     intersections = []
     for k in range(len(tc1) - 1):
@@ -217,6 +245,14 @@ for j in range(len(tc)):
             if sol.converged:
                 intersections.append((sol.root - min_chi_time))
     errors.append(intersections)
+
+    intersections_lc = []
+    for k in range(len(tc1) - 1):
+        if (chi_sq_lc[k] - err_threshold_lc) * (chi_sq_lc[k + 1] - err_threshold_lc) < 0:
+            sol_lc = root_scalar(intersection_func_lc, bracket=[tc1[k], tc1[k + 1]])
+            if sol_lc.converged:
+                intersections_lc.append((sol_lc.root - min_chi_time_lc))
+    errors_lc.append(intersections_lc)
     
     # plt.plot(tc1, chi_sq,label='chisq')
     # plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
@@ -230,16 +266,25 @@ for j in range(len(tc)):
     # plt.legend()
     # plt.show()
 
-print(f'Transit Times(TESS): {tc_chi}')
+print(f'Transit Times(TESS) Masked: {tc_chi}')
+print(f'Transit Times(TESS) Unmasked: {tc_chi_lc}')
+print(f'Difference in times(masked-unmasked): {tc_chi - tc_chi_lc}')
  
 #avg the errors   sig^2 = 0.5(sig1^2 + sig2^2)
 error = []
 for i in range(len(errors)):
     sig = np.sqrt(errors[i][0]**2 + errors[i][1]**2)
     error.append(sig)
-print(f'Avg Errors: {error}')
+print(f'Avg Errors Masked: {error}')
 
-print(f'TTV(TESS): {ttv}')
+error_lc = []
+for i in range(len(errors_lc)):
+    sig = np.sqrt(errors_lc[i][0]**2 + errors_lc[i][1]**2)
+    error_lc.append(sig)
+print(f'Avg Errors Unmasked: {error_lc}')
+
+print(f'TTV(TESS) Masked: {ttv}')
+print(f'TTV(TESS) Unmasked: {ttv_lc}')
 
 
 
