@@ -3,6 +3,8 @@ from ttvfast import models
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+from scipy.optimize import least_squares
+
 
 '''
 # Define the parameters for the planets using models.Planet
@@ -141,8 +143,31 @@ epoch_2_ind = epoch_2 - half_t2
 X1 = epoch_1_ind
 y1 = t_1
 
+# 1. Define the model function
+def model(params, X):
+    slope, intercept = params
+    return slope * X + intercept
+
+# 2. Define the residuals function
+def residuals(params, X, y):
+    return y - model(params, X)
+
+# Initial guess for parameters (slope, intercept)
+initial_guess = [1.0, 0.0]
+
+# 3. Use least_squares to find optimal parameters
+result = least_squares(residuals, initial_guess, args=(epoch_1_ind, t_1))
+
+# Extract the optimal parameters
+slope_1, intercept_1 = result.x
+print(slope_1)
+print(intercept_1)
+
 # Fit the model using numpy.polyfit
 slope_1, intercept_1 = np.polyfit(X1, y1, 1)
+print(slope_1)
+print(intercept_1)
+assert 1==0
 
 # Predict the y values
 y_pred1 = slope_1 * X1 + intercept_1
@@ -167,7 +192,7 @@ residuals2 = y2 - y_pred2
 ### plot 
 plt.scatter(t_1,residuals1,color='orange',label='planet 1 lin')
 plt.scatter(t_2,residuals2,color='blue', label='planet 2 lin')
-plt.title("Linear Regression and hacky TTVs")
+plt.title("Linear Regression TTVs")
 plt.ylabel('TTV (days)')
 plt.xlabel('Time (days)')
 plt.legend()
@@ -218,28 +243,28 @@ print(f'Linear regression Slope 2: {slope_2}')
 print(f'Linear regression Intercept 2: {intercept_2}')
 
 
-### pairwise periods (difference in consecutive times)
-p_1 = np.zeros(len(t_1)-1)
-for i in range(len(p_1)):
-    p = t_1[i+1] - t_1[i]
-    p_1[i] = p
+# ### pairwise periods (difference in consecutive times)
+# p_1 = np.zeros(len(t_1)-1)
+# for i in range(len(p_1)):
+#     p = t_1[i+1] - t_1[i]
+#     p_1[i] = p
 
-p_2 = np.zeros(len(t_2)-1)
-for i in range(len(p_2)):
-    p = t_2[i+1] - t_2[i]
-    p_2[i] = p
+# p_2 = np.zeros(len(t_2)-1)
+# for i in range(len(p_2)):
+#     p = t_2[i+1] - t_2[i]
+#     p_2[i] = p
 
-# Plot histogram 1
-plt.hist(p_1, bins='auto', edgecolor='black')
-plt.title('Histogram of p_1')
-plt.xlabel('Period 1')
-plt.ylabel('Frequency')
-plt.show()
+# # Plot histogram 1
+# plt.hist(p_1, bins='auto', edgecolor='black')
+# plt.title('Histogram of p_1')
+# plt.xlabel('Period 1')
+# plt.ylabel('Frequency')
+# plt.show()
 
-# Plot histogram 2
-plt.hist(p_2, bins='auto', edgecolor='black')
-plt.title('Histogram of p_2')
-plt.xlabel('Period 2')
-plt.ylabel('Frequency')
-plt.tight_layout()
-plt.show()
+# # Plot histogram 2
+# plt.hist(p_2, bins='auto', edgecolor='black')
+# plt.title('Histogram of p_2')
+# plt.xlabel('Period 2')
+# plt.ylabel('Frequency')
+# plt.tight_layout()
+# plt.show()
