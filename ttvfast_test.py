@@ -3,6 +3,8 @@ from ttvfast import models
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+from scipy.optimize import least_squares
+
 
 '''
 # Define the parameters for the planets using models.Planet
@@ -141,8 +143,31 @@ epoch_2_ind = epoch_2 - half_t2
 X1 = epoch_1_ind
 y1 = t_1
 
+# 1. Define the model function
+def model(params, X):
+    slope, intercept = params
+    return slope * X + intercept
+
+# 2. Define the residuals function
+def residuals(params, X, y):
+    return y - model(params, X)
+
+# Initial guess for parameters (slope, intercept)
+initial_guess = [1.0, 0.0]
+
+# 3. Use least_squares to find optimal parameters
+result = least_squares(residuals, initial_guess, args=(epoch_1_ind, t_1))
+
+# Extract the optimal parameters
+slope_1, intercept_1 = result.x
+print(slope_1)
+print(intercept_1)
+
 # Fit the model using numpy.polyfit
 slope_1, intercept_1 = np.polyfit(X1, y1, 1)
+print(slope_1)
+print(intercept_1)
+assert 1==0
 
 # Predict the y values
 y_pred1 = slope_1 * X1 + intercept_1

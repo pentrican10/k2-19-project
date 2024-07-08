@@ -8,7 +8,10 @@ import batman
 from scipy.stats import norm
 from scipy.optimize import minimize
 from scipy.optimize import root_scalar
+from scipy.optimize import least_squares
 
+### create switch to use mask or not
+mask_transits = True
 
 data_dir = "C:\\Users\\Paige\\Projects\\data\\k2-19_data"
 
@@ -158,7 +161,7 @@ print(f'TC guess(TESS): {tc_guess}')
 
 ttv_min= 0.00694444
 ### set range for search: [#hours] * [days per hour]
-ttv_hour = 6* 0.0416667 # 1 hour to days
+ttv_hour = 2* 0.0416667 # 1 hour to days
 #tc_guess = (2530.28, 2546.12, 2554.04, 2561.96, 2569.88, 2577.8, 3266.84, 3282.68)
 
 ### get tc ranges 
@@ -166,7 +169,7 @@ tc = []
 for i in range(len(tc_guess)):
     start = tc_guess[i] - ttv_hour
     end = tc_guess[i] + ttv_hour
-    t = np.linspace(start,end, 100)
+    t = np.linspace(start,end, 1000)
     tc.append(t)
 
 
@@ -213,8 +216,25 @@ for j in range(len(tc)):
         chi_squared_lc = np.sum(((flux_lc[mask_lc] - model_flux_lc) / sigma2_lc)**2)
         chi_sq_lc[i] = (chi_squared_lc)
 
+    ### fit parabola to the chisq
+    p_chi_sq = np.polyfit(tc1, chi_sq, 2)  #masked
+    p_chi_sq_lc = np.polyfit(tc1, chi_sq_lc, 2)  #unmasked 
 
-        
+    ### Extract the coefficients   y = ax^2 + bx + c
+    a_chi_sq, b_chi_sq, c_chi_sq = p_chi_sq
+    a_chi_sq_lc, b_chi_sq_lc, c_chi_sq_lc = p_chi_sq_lc
+    
+    ### Find the minimum of the parabola xmin = -b/2a from taking derivative=0
+    tc_best_fit = -b_chi_sq / (2 * a_chi_sq)
+    tc_best_fit_lc = -b_chi_sq_lc / (2 * a_chi_sq_lc)
+    
+    ### Calculate the minimum chi-squared value
+    chi_sq_min = a_chi_sq * tc_best_fit**2 + b_chi_sq * tc_best_fit + c_chi_sq
+    chi_sq_min_lc = a_chi_sq_lc * tc_best_fit_lc**2 + b_chi_sq_lc * tc_best_fit_lc + c_chi_sq_lc
+
+    ### Calculate the parabola best fit 
+    p_1 = a_chi_sq*tc1**2 + b_chi_sq*tc1 + c_chi_sq
+    
 
     ### masked
     min_chi_time = tc1[np.argmin(chi_sq)]
@@ -254,28 +274,31 @@ for j in range(len(tc)):
                 intersections_lc.append((sol_lc.root - min_chi_time_lc))
     errors_lc.append(intersections_lc)
     
-    # plt.plot(tc1, chi_sq,label='chisq')
-    # plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
-    # plt.axvline(x=min_chi_time, color='green', linestyle='--', label='Chisq min')
-    # # for inter in intersections:
-    # #     plt.axvline(x=inter, color='blue', linestyle='--')
-    # plt.axhline(y=err_threshold, color='purple', linestyle='--', label='Error Threshold')
-    # plt.title(f'Transit {j+1}: Planet b')
-    # plt.xlabel('tc')
-    # plt.ylabel('X^2')
-    # plt.legend()
-    # plt.show()
+    plt.plot(tc1, chi_sq,label='chisq')
+    plt.plot(tc1, p_1,label='chisq parabola', color='orange')
+    plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
+    plt.axvline(x=min_chi_time, color='green', linestyle='--', label='Chisq min')
+    plt.axvline(x=tc1[np.argmin(p_1)], color='orange', linestyle='--', label='Chisq min parabola')
+
+    # for inter in intersections:
+    #     plt.axvline(x=inter, color='blue', linestyle='--')
+    plt.axhline(y=err_threshold, color='purple', linestyle='--', label='Error Threshold')
+    plt.title(f'Transit {j+1}: Planet b')
+    plt.xlabel('tc')
+    plt.ylabel('X^2')
+    plt.legend()
+    plt.show()
 
 print(f'Transit Times(TESS) Masked: {tc_chi}')
 print(f'Transit Times(TESS) Unmasked: {tc_chi_lc}')
 print(f'Difference in times(masked-unmasked): {tc_chi - tc_chi_lc}')
  
 #avg the errors   sig^2 = 0.5(sig1^2 + sig2^2)
-error = []
+err_tc_chi = []
 for i in range(len(errors)):
     sig = np.sqrt(errors[i][0]**2 + errors[i][1]**2)
-    error.append(sig)
-print(f'Avg Errors Masked: {error}')
+    err_tc_chi.append(sig)
+print(f'Avg Errors Masked: {err_tc_chi}')
 
 error_lc = []
 for i in range(len(errors_lc)):
@@ -299,13 +322,103 @@ plt.ylabel('TTV value')
 plt.show()
 
 
+#######################################################################################################################
+
+### Function to generate the transit model
+def transit_model(theta, time):
+    params = batman.TransitParams()
+    params.t0, params.per, params.rp, params.b, params.T14, q1, q2 = theta
+    params.u = [2*np.sqrt(q1)*q2, np.sqrt(q1)*(1-2*q2)]  # Limb darkening coefficients
+    params.limb_dark = 'quadratic'
+    
+    model = batman.TransitModel(params, time)
+    return model.light_curve(params)
+
+### Residuals function for least_squares
+def residuals(theta, time, flux, flux_err):
+    model_flux = transit_model(theta, time)
+    return (flux - model_flux) / flux_err
+
+### Initialize arrays to store results
+optimal_params_list = []
+errors_list = []
+
+# Loop over each tc_guess
+for i in range(len(tc_guess)):
+    ### start lstsq with the chisq guess
+    t0_b = tc_chi[i]
+    ### Initial guess for parameters
+    theta_initial = [t0_b, per_b, rp_b, b_b, T14_b, q1_b, q2_b]
+    
+    ### Mask data - extract relevant photometry
+    start = t0_b - ttv_hour
+    end = t0_b + ttv_hour
+    mask = (time > start) & (time < end)
+    
+    ### Use least_squares to find optimal parameters
+    result = least_squares(residuals, theta_initial, args=(time[mask], flux[mask], flux_err[mask]))
+    
+    ### Extract optimal parameters
+    optimal_params = result.x
+    optimal_params_list.append(optimal_params)
+
+    ### calculate errors
+    # Calculate the covariance matrix from the Jacobian
+    J = result.jac
+    cov = np.linalg.pinv(J.T @ J)   #is this ok? I got an err_tc_chi with .inv and it suggested using .pinv pseudo inverse
+    
+    # Calculate standard errors
+    errors = np.sqrt(np.diag(cov))
+    errors_list.append(errors)
 
 
+### Output results
+tc_lstsq = []
+err_tc_lstsq = []
+print("Optimal Parameters for each guess:")
+for params, errors in zip(optimal_params_list, errors_list):
+    tc_lstsq.append(params[0])
+    err_tc_lstsq.append(errors[0])
 
+
+# print(f'Transit Times(Least Sq) Masked: {tc_lstsq}')
+# print(f'Errors (Least Sq) Masked: {err_tc_lstsq}')
+# print(f'Transit Times(TESS Chi sq) Masked: {tc_chi}')
+# print(f'Avg Errors (chi sq) Masked: {err_tc_chi}')
+# print(f'TC guess(TESS): {tc_guess}')
+### Print the rounded values
+print(f'Transit Times(Least Sq) Masked: {[round(val, 4) for val in tc_lstsq]}')
+print(f'Errors (Least Sq) Masked: {[round(val, 4) for val in err_tc_lstsq]}')
+print(f'Transit Times(TESS Chi sq) Masked: {[round(val, 4) for val in tc_chi]}')
+print(f'Avg Errors (chi sq) Masked: {[round(val, 4) for val in err_tc_chi]}')
+print(f'TC guess(TESS): {[round(val, 4) for val in tc_guess]}')
+
+transit_index = range(len(tc_lstsq))
+
+### Loop through each transit index to create individual plots
+for i in transit_index:
+    ### Plot Chi Square with error bars
+    plt.errorbar(i+1, tc_chi[i], yerr=err_tc_chi[i], fmt='s', label='Chi Square', capsize=5)
+
+    ### Plot Least Squares with error bars
+    plt.errorbar(i+1, tc_lstsq[i], yerr=err_tc_lstsq[i], fmt='o', label='Least Squares', capsize=5)
+
+    ### Plot TC Guess
+    plt.plot(i+1, tc_guess[i], 'x', label='TC Guess')
+
+    plt.xlabel('Transit num')
+    plt.ylabel('Transit Times')
+    plt.title(f'Transit Times with Error Bars - Transit {i+1}')
+    plt.legend()
+    plt.show()
+
+
+####################################################################################################################
+'''
 tc_test = tc_chi
 for i in range(len(tc_test)):
-    start = tc_test[i] - (72* 0.0416667)
-    end = tc_test[i] + (72* 0.0416667)
+    start = tc_test[i] - (24* 0.0416667)
+    end = tc_test[i] + (24* 0.0416667)
     # start = tc_test[1] - (24* 0.0416667)
     # end = tc_test[1] + (24* 0.0416667)
     mask = (time > (start)) & (time < (end))
@@ -349,7 +462,7 @@ for i in range(len(tc_test)):
     plt.legend()
     plt.show()
 
-
+'''
 
 
 '''
