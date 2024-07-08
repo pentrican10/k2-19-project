@@ -10,7 +10,7 @@ from scipy.optimize import minimize
 from scipy.optimize import root_scalar
 from scipy.optimize import least_squares
 
-### create switch to use mask or not
+### switch to mask out transits
 mask_transits = True
 
 data_dir = "C:\\Users\\Paige\\Projects\\data\\k2-19_data"
@@ -66,6 +66,7 @@ b_c = 0.630
 q1_c = 0.4
 q2_c = 0.3  
 
+#########################################################################################################################################
 
 ### generate ttv (lin ephem from params in table 3)
 p_b = 7.920925490169578   ### used linear regression, changed the slope to the one extracted original paper value 7.9222
@@ -84,6 +85,12 @@ paper_ttv_b = pl_b.Tc.values - predicted_time
 print(f'TC(paper) b: {pl_b.Tc.values}')
 print(f'TTV from ephem b: {paper_ttv_b}')
 
+### from BLS in k2-19_project.py
+planet_b_period = 7.9204920492049204
+planet_b_t0 = 2530.2807708159753
+print(f'Period(BLS): {planet_b_period}')
+print(f'Tc(BLS): {planet_b_t0}')
+
 ### planet c
 p_c = 11.8993
 tc_c = 2020.0007
@@ -99,35 +106,33 @@ paper_ttv_c = pl_c.Tc.values - predicted_time_c
 print(f'TC(paper) c: {pl_c.Tc.values}')
 print(f'TTV from ephem c: {paper_ttv_c}')
 
+##########################################################################################################################################
 
 ### Download the light curve data
 lc = lk.search_lightcurve("K2-19",author = 'SPOC').download_all()
 lc = lc.stitch()
-### plot this without flatten, mask transit times before flattening
-#transit_times = [4697.28834658, 4713.12428017, 4721.03972171, 4728.96021376, 4736.88070581, 4744.79614735, 5433.87895563, 5449.71993973]
-transit_times = [4697.28834658, 4713.12933068, 4721.03972171, 4728.96021376, 4736.88070581, 4744.80119786, 5433.87895563, 5449.71993973]
-masked_lc = lc
+if mask_transits == True:
+    ### mask transit times before flattening
+    #transit_times = [4697.28834658, 4713.12428017, 4721.03972171, 4728.96021376, 4736.88070581, 4744.79614735, 5433.87895563, 5449.71993973]
+    transit_times = [4697.28834658, 4713.12933068, 4721.03972171, 4728.96021376, 4736.88070581, 4744.80119786, 5433.87895563, 5449.71993973]
+    masked_lc = lc
 
-times = convert_time(masked_lc.time.value)
+    times = convert_time(masked_lc.time.value)
 
-### Initialize a mask with all False values (i.e., include all data points initially)
-mask = np.zeros_like(times, dtype=bool)
+    ### Initialize a mask with all False values (i.e., include all data points initially)
+    mask = np.zeros_like(times, dtype=bool)
 
-### Iterate through each transit time and update the mask
-for transit_time in transit_times:
-    mask |= (times > (transit_time - T14_b/2)) & (times < (transit_time + T14_b/2))
+    ### Iterate through each transit time and update the mask
+    for transit_time in transit_times:
+        mask |= (times > (transit_time - T14_b/2)) & (times < (transit_time + T14_b/2))
 
-### Flatten the masked light curve
-masked_lc = masked_lc.flatten(window_length=901, mask=mask).remove_outliers()
-### flatten unmasked lightcurve 
-lc = lc.flatten(window_length=901).remove_outliers()
+    ### Flatten the masked light curve
+    masked_lc = masked_lc.flatten(window_length=901, mask=mask).remove_outliers()
+    lc = masked_lc
+else:
+    ### flatten unmasked lightcurve 
+    lc = lc.flatten(window_length=901).remove_outliers()
 
-
-### from BLS in k2-19_project.py
-planet_b_period = 7.9204920492049204
-planet_b_t0 = 2530.2807708159753
-print(f'Period(BLS): {planet_b_period}')
-print(f'Tc(BLS): {planet_b_t0}')
 
 ### initialize guess times
 transit_num = [0,2,3,4,5,6,93,95]
@@ -141,25 +146,18 @@ for num in transit_num:
 t_num_paper = [337,339,340,341,342,343,430,432]
 t_num_paper_c = []
 
-### masked data
-time_tess = np.array(masked_lc.time.value)
-flux=np.array(masked_lc.flux)
-flux_err = np.array(masked_lc.flux_err)
-
-### un-masked data
-time_tess_lc = np.array(lc.time.value)
-flux_lc=np.array(lc.flux)
-flux_err_lc = np.array(lc.flux_err)
+### data from lightcurve 
+time_tess = np.array(lc.time.value)
+flux=np.array(lc.flux)
+flux_err = np.array(lc.flux_err)
 
 time = convert_time(time_tess)
-time_lc = convert_time(time_tess_lc)
 tc_guess = convert_time(np.array(tc_guess))
 tc_guess = np.array(tc_guess)
 print(f'TC guess(TESS): {tc_guess}')
 
 
 
-ttv_min= 0.00694444
 ### set range for search: [#hours] * [days per hour]
 ttv_hour = 2* 0.0416667 # 1 hour to days
 #tc_guess = (2530.28, 2546.12, 2554.04, 2561.96, 2569.88, 2577.8, 3266.84, 3282.68)
@@ -174,11 +172,9 @@ for i in range(len(tc_guess)):
 
 
 tc_chi = np.zeros(len(tc))
-tc_chi_lc = np.zeros(len(tc))
 ttv = np.zeros(len(tc))
 ttv_lc = np.zeros(len(tc))
 errors = []
-errors_lc = []
 ### plot X^2 vs tc for each guess
 for j in range(len(tc)):
     tc1 = tc[j]
@@ -208,29 +204,18 @@ for j in range(len(tc)):
         chi_squared = np.sum(((flux[mask] - model_flux) / sigma2)**2)
         chi_sq[i] = (chi_squared)
 
-        ### repeat for the unmasked lc
-        mask_lc = (time_lc > (start)) & (time_lc < (end))
-        transit_model_lc = batman.TransitModel(params, time_lc[mask_lc])
-        model_flux_lc = transit_model_lc.light_curve(params)
-        sigma2_lc = flux_err_lc[mask_lc]
-        chi_squared_lc = np.sum(((flux_lc[mask_lc] - model_flux_lc) / sigma2_lc)**2)
-        chi_sq_lc[i] = (chi_squared_lc)
 
     ### fit parabola to the chisq
-    p_chi_sq = np.polyfit(tc1, chi_sq, 2)  #masked
-    p_chi_sq_lc = np.polyfit(tc1, chi_sq_lc, 2)  #unmasked 
+    p_chi_sq = np.polyfit(tc1, chi_sq, 2)  
 
     ### Extract the coefficients   y = ax^2 + bx + c
     a_chi_sq, b_chi_sq, c_chi_sq = p_chi_sq
-    a_chi_sq_lc, b_chi_sq_lc, c_chi_sq_lc = p_chi_sq_lc
     
     ### Find the minimum of the parabola xmin = -b/2a from taking derivative=0
     tc_best_fit = -b_chi_sq / (2 * a_chi_sq)
-    tc_best_fit_lc = -b_chi_sq_lc / (2 * a_chi_sq_lc)
     
     ### Calculate the minimum chi-squared value
     chi_sq_min = a_chi_sq * tc_best_fit**2 + b_chi_sq * tc_best_fit + c_chi_sq
-    chi_sq_min_lc = a_chi_sq_lc * tc_best_fit_lc**2 + b_chi_sq_lc * tc_best_fit_lc + c_chi_sq_lc
 
     ### Calculate the parabola best fit 
     p_1 = a_chi_sq*tc1**2 + b_chi_sq*tc1 + c_chi_sq
@@ -244,18 +229,10 @@ for j in range(len(tc)):
     idx = t_num_paper[j]
     ttv[j] = omc(min_chi_time, idx, p_b, tc_b)#*24 #days to hours
 
-    ### unmasked
-    min_chi_time_lc = tc1[np.argmin(chi_sq_lc)]
-    min_chi_lc = chi_sq_lc.min()
-
-    tc_chi_lc[j] = min_chi_time_lc
-    idx_lc = t_num_paper[j]
-    ttv_lc[j] = omc(min_chi_time_lc, idx_lc, p_b, tc_b)#*24 #days to hours
-
+  
 
     ### delta chisq = 1 gives errors
     err_threshold = min_chi + 1
-    err_threshold_lc = min_chi_lc +1
   
     # Find the intersection using root_scalar
     intersections = []
@@ -266,14 +243,7 @@ for j in range(len(tc)):
                 intersections.append((sol.root - min_chi_time))
     errors.append(intersections)
 
-    intersections_lc = []
-    for k in range(len(tc1) - 1):
-        if (chi_sq_lc[k] - err_threshold_lc) * (chi_sq_lc[k + 1] - err_threshold_lc) < 0:
-            sol_lc = root_scalar(intersection_func_lc, bracket=[tc1[k], tc1[k + 1]])
-            if sol_lc.converged:
-                intersections_lc.append((sol_lc.root - min_chi_time_lc))
-    errors_lc.append(intersections_lc)
-    
+  
     plt.plot(tc1, chi_sq,label='chisq')
     plt.plot(tc1, p_1,label='chisq parabola', color='orange')
     plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
@@ -289,27 +259,25 @@ for j in range(len(tc)):
     plt.legend()
     plt.show()
 
-print(f'Transit Times(TESS) Masked: {tc_chi}')
-print(f'Transit Times(TESS) Unmasked: {tc_chi_lc}')
-print(f'Difference in times(masked-unmasked): {tc_chi - tc_chi_lc}')
+# print(f'Transit Times(TESS) Masked: {tc_chi}')
+# print(f'Transit Times(TESS) Unmasked: {tc_chi_lc}')
+# print(f'Difference in times(masked-unmasked): {tc_chi - tc_chi_lc}')
  
 #avg the errors   sig^2 = 0.5(sig1^2 + sig2^2)
 err_tc_chi = []
 for i in range(len(errors)):
     sig = np.sqrt(errors[i][0]**2 + errors[i][1]**2)
     err_tc_chi.append(sig)
-print(f'Avg Errors Masked: {err_tc_chi}')
 
-error_lc = []
-for i in range(len(errors_lc)):
-    sig = np.sqrt(errors_lc[i][0]**2 + errors_lc[i][1]**2)
-    error_lc.append(sig)
-print(f'Avg Errors Unmasked: {error_lc}')
-
-print(f'TTV(TESS) Masked: {ttv}')
-print(f'TTV(TESS) Unmasked: {ttv_lc}')
-
-
+### print values 
+if mask_transits == True:
+    print(f'Transit Times(TESS) Masked: {tc_chi}')
+    print(f'Avg Errors Masked: {err_tc_chi}')
+    print(f'TTV(TESS) Masked: {ttv}')
+else:
+    print(f'Transit Times(TESS) Un-Masked: {tc_chi}')
+    print(f'Avg Errors Un-Masked: {err_tc_chi}')
+    print(f'TTV(TESS) Un-Masked: {ttv}')
 
 
 plt.scatter(tc_chi, ttv)
@@ -365,7 +333,7 @@ for i in range(len(tc_guess)):
     ### calculate errors
     # Calculate the covariance matrix from the Jacobian
     J = result.jac
-    cov = np.linalg.pinv(J.T @ J)   #is this ok? I got an err_tc_chi with .inv and it suggested using .pinv pseudo inverse
+    cov = np.linalg.pinv(J.T @ J)   
     
     # Calculate standard errors
     errors = np.sqrt(np.diag(cov))
@@ -386,12 +354,20 @@ for params, errors in zip(optimal_params_list, errors_list):
 # print(f'Transit Times(TESS Chi sq) Masked: {tc_chi}')
 # print(f'Avg Errors (chi sq) Masked: {err_tc_chi}')
 # print(f'TC guess(TESS): {tc_guess}')
+
 ### Print the rounded values
-print(f'Transit Times(Least Sq) Masked: {[round(val, 4) for val in tc_lstsq]}')
-print(f'Errors (Least Sq) Masked: {[round(val, 4) for val in err_tc_lstsq]}')
-print(f'Transit Times(TESS Chi sq) Masked: {[round(val, 4) for val in tc_chi]}')
-print(f'Avg Errors (chi sq) Masked: {[round(val, 4) for val in err_tc_chi]}')
-print(f'TC guess(TESS): {[round(val, 4) for val in tc_guess]}')
+if mask_transits == True:
+    print(f'Transit Times(Least Sq) Masked: {[round(val, 4) for val in tc_lstsq]}')
+    print(f'Errors (Least Sq) Masked: {[round(val, 4) for val in err_tc_lstsq]}')
+    print(f'Transit Times(TESS Chi sq) Masked: {[round(val, 4) for val in tc_chi]}')
+    print(f'Avg Errors (chi sq) Masked: {[round(val, 4) for val in err_tc_chi]}')
+    print(f'TC guess(TESS): {[round(val, 4) for val in tc_guess]}')
+else:
+    print(f'Transit Times(Least Sq) Un-Masked: {[round(val, 4) for val in tc_lstsq]}')
+    print(f'Errors (Least Sq) Un-Masked: {[round(val, 4) for val in err_tc_lstsq]}')
+    print(f'Transit Times(TESS Chi sq) Un-Masked: {[round(val, 4) for val in tc_chi]}')
+    print(f'Avg Errors (chi sq) Un-Masked: {[round(val, 4) for val in err_tc_chi]}')
+    print(f'TC guess(TESS): {[round(val, 4) for val in tc_guess]}')
 
 transit_index = range(len(tc_lstsq))
 
@@ -415,6 +391,7 @@ for i in transit_index:
 
 ####################################################################################################################
 '''
+### Photometry
 tc_test = tc_chi
 for i in range(len(tc_test)):
     start = tc_test[i] - (24* 0.0416667)
