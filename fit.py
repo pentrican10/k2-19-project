@@ -354,7 +354,7 @@ all_err_ttv = np.concatenate([err_paper_ttv_b, err_tc_chi_p])
 all_transit_num = np.concatenate([transit_b, t_num_paper])
 
 # Initial guess for the parameters: amplitude, frequency, phase, offset
-initial_guess = [0.01, 2*np.pi/365, 0, 0,0]
+initial_guess = [0.01, 2*np.pi/365, 0, 0, 0]
 
 # Fit the sine function to the data
 #popt, pcov = curve_fit(sine_function, all_times, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
@@ -368,13 +368,13 @@ print(f'p: {p}')
 
 ### Calculate the fitted TTV values
 fitted_ttv = sine_function(all_times, *popt) 
-### Plot the fitted sine curve
 t_fit = np.linspace(min(all_times), max(all_times), 1000)
 ### Create a figure with two subplots (one above the other)
 fig, (ax1, ax2) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]},sharex=True)
 normalized_sine = sine_function(t_fit, *popt) - (p*t_fit) - offset_fit
 norm_chi_ttv = ttv_p - (p*tc_chi_parabola) - offset_fit
 norm_paper_ttv = paper_ttv_b - (p*tc_paper) - offset_fit
+
 ax1.plot(t_fit, normalized_sine, 'r-', label='Fitted sine curve')
 ax1.errorbar(tc_chi_parabola, norm_chi_ttv, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='bo', capsize=5, label='TESS times')
 ax1.errorbar(tc_paper, norm_paper_ttv, xerr=err_tc_paper, yerr=err_paper_ttv_b, fmt='bs', capsize=5, label='Paper times')
@@ -397,7 +397,60 @@ ax2.set_ylim(-1.1 * residual_range, 1.1 * residual_range)
 plt.tight_layout()
 plt.show()
 
+from ttvfast_test import t_1, residuals1, t_2, residuals2
+#fig, (ax1, ax2) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]},sharex=True)
+plt.scatter(t_1,residuals1,color='orange',s=4,label='planet b ttvfast')
+plt.scatter(t_2,residuals2,color='blue',s=4, label='planet c ttvfast')
+plt.errorbar(tc_chi_parabola, norm_chi_ttv, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='ro', capsize=5, label='TESS times b')
+plt.errorbar(tc_paper, norm_paper_ttv, xerr=err_tc_paper, yerr=err_paper_ttv_b, fmt='rs', capsize=5, label='Paper times b')
+plt.plot(t_fit, normalized_sine,color='black', label='Fitted sine curve b')
+plt.title("TTVfast and Measured Times - K2-19")
+plt.ylabel('TTV (days)')
+plt.legend()
+plt.show()
 
+
+### method 2
+# Initial guess for the parameters: amplitude, frequency, phase, offset
+initial_guess2 = [0.01, 2*np.pi/365, 0, 7.9222, 2027.9023]
+
+# Fit the sine function to the data
+popt2, pcov2 = curve_fit(sine_function, all_transit_num, all_times, p0=initial_guess2, sigma=all_err_ttv, absolute_sigma=True)
+A_fit2, omega_fit2, phi_fit2, p2, offset_fit2 = popt2
+print(f'offset2: {offset_fit2}')
+print(f'p2: {p2}')
+
+transit_b = np.array(transit_b,dtype='float64')
+t_num_paper = np.array(t_num_paper,dtype='float64')
+
+### Calculate the fitted TTV values
+# fitted_ttv = sine_function(all_times, *popt2) 
+t_fit2 = np.linspace(min(all_transit_num), max(all_transit_num), 1000)
+### Create a figure with two subplots (one above the other)
+fig2, (ax3, ax4) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]},sharex=True)
+normalized_sine2 = sine_function(t_fit2, *popt2) - (p2*t_fit2) - offset_fit2
+norm_tc_chi_parabola = tc_chi_parabola - (p2*t_num_paper) - offset_fit2
+norm_tc_paper = tc_paper - (p2*transit_b) - offset_fit2
+
+
+ax3.plot(t_fit2,normalized_sine2, 'r-', label='Fitted sine curve')
+ax3.errorbar(t_num_paper, norm_tc_chi_parabola, yerr=err_tc_chi_p, fmt='bo', capsize=5, label='TESS times')
+ax3.errorbar(transit_b, norm_tc_paper, yerr=err_tc_paper, fmt='bs', capsize=5, label='Paper times')
+ax3.set_title('Times: Planet b')
+ax3.set_ylabel('times (days)')
+ax3.set_xlabel('transit number')
+ax3.legend()
+
+transit_b = np.asarray(transit_b, dtype='float64')
+residual_paper = tc_paper - sine_function(transit_b, *popt2)
+residual_tess = tc_chi_parabola - sine_function(t_num_paper, *popt2)
+ax4.plot(transit_b, residual_paper, 'bs')
+ax4.plot(t_num_paper, residual_tess, 'bo')
+ax4.axhline(y=0, color='r', linestyle='-')
+ax4.set_ylabel('Residuals (days)')
+
+
+plt.show()
 #######################################################################################################################
 
 ### Function to generate the transit model
@@ -489,12 +542,6 @@ plt.xlabel('TC (days)')
 plt.ylabel('TTV value (days)')
 plt.legend()
 #plt.show()
-
-# print(f'Transit Times(Least Sq) Masked: {tc_lstsq}')
-# print(f'Errors (Least Sq) Masked: {err_tc_lstsq}')
-# print(f'Transit Times(TESS Chi sq) Masked: {tc_chi}')
-# print(f'Avg Errors (chi sq) Masked: {err_tc_chi}')
-# print(f'TC guess(TESS): {tc_guess}')
 
 ### Print the rounded values
 if mask_transits == True:
