@@ -73,7 +73,7 @@ ecc1 = 0.20
 i1 = 91.5                       #deg
 Omega1 = 0.                     #longnode  deg
 argument1 = np.arccos((0.02)/(np.sqrt(ecc1))) #deg
-
+argument1 = np.arctan2(-0.44,0.02) #deg   sqrt(ecc)cos(argument)=0.02...
 ### from paper 
 mass2 = (10.8 * earth_mass)     #M_sun
 per2 = 11.8993                  #days
@@ -81,26 +81,37 @@ ecc2 = 0.21
 i2 = 91.1                       #deg
 Omega2 = -7.4                   #longnode deg
 argument2 = np.arccos((0.04)/(np.sqrt(ecc2))) #deg
+print(argument2)
+argument2 = np.arctan2(-0.46,0.04) #deg
+print(argument2)
 
 ### mean anomaly
 def mean_anomaly(ecc, Omega, argument):
     ### omega is longitude of periastron (radians)  omega = Omega + argument = longnode + argument
-    Omega = np.deg2rad(Omega)
-    argument = np.deg2rad(argument)
     omega = Omega + argument
-    f = np.pi/2 - omega
+    f = 90 - omega
     ee = 2 * np.arctan(np.tan(f/2) * np.sqrt((1-ecc)/(1+ecc)))  # eccentric anomaly
     m=ee - ecc*np.sin(ee)
-    m= np.rad2deg(m) #ttvfast takes this in degrees
     return m
+
+# def mean_anomaly(ecc, Omega, argument):
+#     ### omega is longitude of periastron (radians)  omega = Omega + argument = longnode + argument
+#     Omega = np.deg2rad(Omega)
+#     argument = np.deg2rad(argument)
+#     omega = Omega + argument
+#     f = np.pi/2 - omega
+#     rad_factor = np.pi/180
+#     ee = 2 * np.arctan(np.tan((f/2) * rad_factor) * np.sqrt((1-ecc)/(1+ecc)))  # eccentric anomaly
+#     m=ee - ecc*np.sin(ee)
+#     m= np.rad2deg(m) #ttvfast takes this in degrees
+#     return m
+
 M1 = mean_anomaly(ecc1, Omega1, argument1)
-M2 = mean_anomaly(ecc2,Omega2, argument2)
-
-
+M2 = mean_anomaly(ecc2, Omega2, argument2)
 
 
 planet1 = models.Planet(
-    mass=mass1,                         # M_sun
+    mass=9.72814479638009e-05,                         # M_sun
     period=per1,                        # days
     eccentricity=ecc1,
     inclination=i1,                     # degrees
@@ -110,7 +121,7 @@ planet1 = models.Planet(
 )
 
 planet2 = models.Planet(
-    mass=mass2,
+    mass=3.242714932126697e-05,
     period=per2,
     eccentricity=ecc2,
     inclination=i2,
@@ -119,6 +130,12 @@ planet2 = models.Planet(
     mean_anomaly=M2,
 )
 #'''
+print(f'planet 1 mass: {planet1.mass}')
+print(f'planet 2 mass: {planet2.mass}')
+print(f'planet 1 period: {planet1.period}')
+print(f'planet 2 period: {planet2.period}')
+
+
 
 
 ''' Original params from example
@@ -186,7 +203,7 @@ results = ttvfast.ttvfast(planets, stellar_mass, Time, dt, Total)
 ### Extract necessary data from the results
 planet_ind = np.array(results['positions'][0])
 epoch_int = np.array(results['positions'][1])   #transit number
-times_ = (np.array(results['positions'][2]))
+times_ = np.array(results['positions'][2])
 rsky_values = np.array(results['positions'][3])
 vsky_values = np.array(results['positions'][4])
 
@@ -283,8 +300,8 @@ y_pred2 = slope_2 * X2 + intercept_2
 residuals2 = y2 - y_pred2
 
 ### plot 
-plt.scatter(t_1,residuals1,color='orange',label='planet 1 lin')
-plt.scatter(t_2,residuals2,color='blue', label='planet 2 lin')
+plt.scatter(t_1,residuals1,color='orange',label='planet b lin')
+plt.scatter(t_2,residuals2,color='blue', label='planet c lin')
 plt.title("Linear Regression TTVs - K2-19")
 plt.ylabel('TTV (days)')
 plt.xlabel('Time (days)')
@@ -306,12 +323,6 @@ for i in range(len(epoch_1_ind)):
 for i in range(len(epoch_2_ind)):
     expected_time2 =   period_sim2 * epoch_2_ind[i]
     expected_time_2[i] = expected_time2
-# for i in range(len(epoch_1_ind)):
-#     expected_time1 =  intercept_1 + slope_1 * epoch_1_ind[i]
-#     expected_time_1[i] = expected_time1
-# for i in range(len(epoch_2_ind)):
-#     expected_time2 =  intercept_2 + slope_2 * epoch_2_ind[i]
-#     expected_time_2[i] = expected_time2
 
 omc1 = t_1 - expected_time_1
 omc2 = t_2 - expected_time_2
@@ -336,28 +347,3 @@ print(f'Linear regression Slope 2: {slope_2}')
 print(f'Linear regression Intercept 2: {intercept_2}')
 
 
-# ### pairwise periods (difference in consecutive times)
-# p_1 = np.zeros(len(t_1)-1)
-# for i in range(len(p_1)):
-#     p = t_1[i+1] - t_1[i]
-#     p_1[i] = p
-
-# p_2 = np.zeros(len(t_2)-1)
-# for i in range(len(p_2)):
-#     p = t_2[i+1] - t_2[i]
-#     p_2[i] = p
-
-# # Plot histogram 1
-# plt.hist(p_1, bins='auto', edgecolor='black')
-# plt.title('Histogram of p_1')
-# plt.xlabel('Period 1')
-# plt.ylabel('Frequency')
-# plt.show()
-
-# # Plot histogram 2
-# plt.hist(p_2, bins='auto', edgecolor='black')
-# plt.title('Histogram of p_2')
-# plt.xlabel('Period 2')
-# plt.ylabel('Frequency')
-# plt.tight_layout()
-# plt.show()

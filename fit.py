@@ -10,7 +10,7 @@ from scipy.optimize import minimize
 from scipy.optimize import root_scalar
 from scipy.optimize import least_squares
 from scipy.optimize import curve_fit
-import ttvfast_test
+#import ttvfast_test
 
 
 ### switch to mask out transits
@@ -70,46 +70,42 @@ q2_c = 0.3
 #########################################################################################################################################
 
 ### generate ttv (lin ephem from params in table 3)
-p_b = 7.920925490169578   ### used linear regression, changed the slope to the one extracted original paper value 7.9222
-tc_b = 2027.9158659031389 ###2027.9023
+p_b = 7.9222 #7.920925490169578   ### used linear regression, changed the slope to the one extracted original paper value 7.9222
+tc_b = 2027.9023 #2027.9158659031389 ###2027.9023
 # Perform linear regression using numpy.polyfit
-transit_indices = np.array([24, 28, 35, 127, 135, 144, 337, 339, 340, 341, 342, 343, 430, 432])
-transit_t = np.array([2218.0041, 2249.6955, 2305.1505, 3033.8604, 3097.2502, 3168.5368, 4697.28890755,
-                       4713.12745394, 4721.04173821, 4728.95982641, 4736.88095462, 4744.79876123, 5433.87888953, 5449.72028567])
-coefficients, cov_matrix = np.polyfit(transit_indices, transit_t, 1, cov=True)
+# transit_indices = np.array([24, 28, 35, 127, 135, 144, 337, 339, 340, 341, 342, 343, 430, 432])
+# transit_t = np.array([2218.0041, 2249.6955, 2305.1505, 3033.8604, 3097.2502, 3168.5368, 4697.28890755,
+#                        4713.12745394, 4721.04173821, 4728.95982641, 4736.88095462, 4744.79876123, 5433.87888953, 5449.72028567])
+# coefficients, cov_matrix = np.polyfit(transit_indices, transit_t, 1, cov=True)
 
-# Extract slope and intercept
-slope = coefficients[0]
-intercept = coefficients[1]
+# # Extract slope and intercept
+# slope = coefficients[0]
+# intercept = coefficients[1]
 
-# Calculate standard errors
-slope_error = np.sqrt(cov_matrix[0, 0])
-intercept_error = np.sqrt(cov_matrix[1, 1])
-print(f"Slope: {slope} ± {slope_error}")
-print(f"Intercept: {intercept} ± {intercept_error}")
-p_b = slope
-err_p_b = slope_error
-tc_b = intercept
-err_tc_b = intercept_error
+# # Calculate standard errors
+# slope_error = np.sqrt(cov_matrix[0, 0])
+# intercept_error = np.sqrt(cov_matrix[1, 1])
+# print(f"Slope: {slope} ± {slope_error}")
+# print(f"Intercept: {intercept} ± {intercept_error}")
+# p_b = slope
+# err_p_b = slope_error
+# tc_b = intercept
+# err_tc_b = intercept_error
 
 print(f'Period(paper) b: {p_b}')
 print(f'TC(paper) b: {tc_b}')
 transit_b = [24,28,35,127,135,144]
 predicted_time = []
-err_predicted_time = []
 for i in transit_b:
     ephem = tc_b + i* p_b
-    err_ephem = np.sqrt((i*err_p_b)**2 + (err_tc_b)**2)
     predicted_time.append(ephem)
-    err_predicted_time.append(err_ephem)
 print(f'Predicted times(ephem) b: {predicted_time}')
 #print(f'Predicted times error(ephem) b: {err_predicted_time}')
-err_predicted_time = np.array(err_predicted_time)
 pl_b = df[df["Planet"] == "K2-19b"]
 tc_paper = pl_b.Tc.values
 err_tc_paper = pl_b.e_Tc.values
 paper_ttv_b = tc_paper - predicted_time
-err_paper_ttv_b = np.sqrt((err_tc_paper)**2 + (err_predicted_time)**2)
+err_paper_ttv_b = err_tc_paper
 
 print(f'TC(paper) b: {tc_paper}')
 print(f'TC err(paper) b: {err_tc_paper}')
@@ -317,10 +313,7 @@ for j in range(len(tc)):
     # plt.legend()
     # plt.show()
 
-# print(f'Transit Times(TESS) Masked: {tc_chi}')
-# print(f'Transit Times(TESS) Unmasked: {tc_chi_lc}')
-# print(f'Difference in times(masked-unmasked): {tc_chi - tc_chi_lc}')
- 
+
 #avg the errors   sig^2 = 0.5(sig1^2 + sig2^2)
 err_tc_chi = []
 for i in range(len(errors)):
@@ -351,43 +344,55 @@ else:
     print(f'TTV(TESS parabola) Un-Masked: {ttv_p}')
 
 # Define a sine function
-def sine_function(t, A, omega, phi, offset):
-    return A * np.sin(omega * t + phi) + offset
+def sine_function(t, A, omega, phi, p, offset):
+    return A * np.sin(omega * t + phi) + (p * t) + offset
 
 # Concatenate all data points for fitting
-all_times = np.concatenate([tc_chi_parabola, tc_paper])
-all_ttv = np.concatenate([ttv_p, paper_ttv_b])
-all_err_ttv = np.concatenate([err_tc_chi_p, err_paper_ttv_b])
+all_times = np.concatenate([tc_paper, tc_chi_parabola])
+all_ttv = np.concatenate([ paper_ttv_b, ttv_p])
+all_err_ttv = np.concatenate([err_paper_ttv_b, err_tc_chi_p])
+all_transit_num = np.concatenate([transit_b, t_num_paper])
 
 # Initial guess for the parameters: amplitude, frequency, phase, offset
-initial_guess = [0.01, 2*np.pi/365, 0, 0]
+initial_guess = [0.01, 2*np.pi/365, 0, 0,0]
 
 # Fit the sine function to the data
+#popt, pcov = curve_fit(sine_function, all_times, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
 popt, pcov = curve_fit(sine_function, all_times, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
 
 # Extract the fitted parameters
 # add linear slope param +ct to get slope
-A_fit, omega_fit, phi_fit, offset_fit = popt
+A_fit, omega_fit, phi_fit, p, offset_fit = popt
+print(f'offset: {offset_fit}')
+print(f'p: {p}')
 
-# Calculate the fitted TTV values
-fitted_ttv = sine_function(all_times, *popt)
-# Plot the fitted sine curve
+### Calculate the fitted TTV values
+fitted_ttv = sine_function(all_times, *popt) 
+### Plot the fitted sine curve
 t_fit = np.linspace(min(all_times), max(all_times), 1000)
-# Create a figure with two subplots (one above the other)
+### Create a figure with two subplots (one above the other)
 fig, (ax1, ax2) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]},sharex=True)
-ax1.plot(t_fit, sine_function(t_fit, *popt), 'r-', label='Fitted sine curve')
-ax1.errorbar(tc_chi_parabola, ttv_p, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='o', capsize=5, label='TESS times')
-ax1.errorbar(tc_paper, paper_ttv_b, xerr=err_tc_paper, yerr=err_paper_ttv_b, fmt='o', capsize=5, label='Paper times')
+normalized_sine = sine_function(t_fit, *popt) - (p*t_fit) - offset_fit
+norm_chi_ttv = ttv_p - (p*tc_chi_parabola) - offset_fit
+norm_paper_ttv = paper_ttv_b - (p*tc_paper) - offset_fit
+ax1.plot(t_fit, normalized_sine, 'r-', label='Fitted sine curve')
+ax1.errorbar(tc_chi_parabola, norm_chi_ttv, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='bo', capsize=5, label='TESS times')
+ax1.errorbar(tc_paper, norm_paper_ttv, xerr=err_tc_paper, yerr=err_paper_ttv_b, fmt='bs', capsize=5, label='Paper times')
 ax1.set_title('TTV (chisq parabola): Planet b')
 ax1.set_ylabel('TTV value (days)')
 ax1.legend()
 
 # Plot the residuals in the second subplot
 residuals = all_ttv - fitted_ttv
-ax2.plot(all_times, residuals, 'o')
+residuals_paper = (paper_ttv_b - sine_function(tc_paper, *popt)) / err_paper_ttv_b
+residuals_TESS = (ttv_p - sine_function(tc_chi_parabola, *popt)) / err_tc_chi_p
+ax2.plot(tc_paper, residuals_paper, 'bs')
+ax2.plot(tc_chi_parabola, residuals_TESS, 'bo')
 ax2.axhline(y=0, color='r', linestyle='-')
 ax2.set_xlabel('TC (days)')
-ax2.set_ylabel('Residuals (days)')
+ax2.set_ylabel('Norm Residuals (days)')
+residual_range = max(abs(residuals_TESS))
+ax2.set_ylim(-1.1 * residual_range, 1.1 * residual_range)
 
 plt.tight_layout()
 plt.show()
@@ -460,13 +465,13 @@ all_ttv = np.concatenate([ttv_lstsq, paper_ttv_b])
 all_err_ttv = np.concatenate([err_tc_lstsq, err_paper_ttv_b])
 
 # Initial guess for the parameters: amplitude, frequency, phase, offset
-initial_guess = [0.01, 2*np.pi/365, 0, 0]
+initial_guess = [0.01, 2*np.pi/365, 0,0, 0]
 
 # Fit the sine function to the data
 popt, pcov = curve_fit(sine_function, all_times, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
 
 # Extract the fitted parameters
-A_fit, omega_fit, phi_fit, offset_fit = popt
+A_fit, omega_fit, phi_fit, p, offset_fit = popt
 
 # Calculate the fitted TTV values
 fitted_ttv = sine_function(all_times, *popt)
@@ -483,7 +488,7 @@ plt.title(f'TTV (lstsq): Planet b')
 plt.xlabel('TC (days)')
 plt.ylabel('TTV value (days)')
 plt.legend()
-plt.show()
+#plt.show()
 
 # print(f'Transit Times(Least Sq) Masked: {tc_lstsq}')
 # print(f'Errors (Least Sq) Masked: {err_tc_lstsq}')
