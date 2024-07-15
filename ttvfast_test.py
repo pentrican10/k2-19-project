@@ -6,6 +6,7 @@ from sklearn.linear_model import LinearRegression
 from scipy.optimize import least_squares
 
 
+
 '''
 # Define the parameters for the planets using models.Planet
 planet1 = models.Planet(
@@ -33,7 +34,94 @@ planet2 = models.Planet(
 
 gravity = 0.000295994511                        # AU^3/day^2/M_sun
 
+
+
+'''
+stellar_mass = 0.95573417954                    # M_sun
+
+
+planet1 = models.Planet(
+    mass=0.00002878248,                         # M_sun
+    period=1.0917340278625494e+01,              # days
+    eccentricity=5.6159310042858110e-02,
+    inclination=9.0921164935951211e+01,         # degrees
+    longnode=-1.1729336712101943e-18,           # degrees
+    argument=180.94e+00,            # degrees
+    mean_anomaly=-8.7093652691581923e+01,       # degrees
+)
+
+planet2 = models.Planet(
+    mass=0.00061895914,
+    period=2.2266898036209028e+01,
+    eccentricity=5.6691301931178648e-02,
+    inclination=8.7598285693573246e+01,
+    longnode=4.6220554014026838e-01,
+    argument=1.6437e+00,
+    mean_anomaly=-1.9584857031843157e+01,
+)
+
+'''
+
+#''' k2-19 param
+stellar_mass = 0.88                    # M_sun
+earth_mass = 5.972e+24 / 1.989e+30     # M_sun
+
+### from paper
+mass1 = (32.4 * earth_mass)     #M_sun
+per1 = 7.9222                   #days
+ecc1 = 0.20
+i1 = 91.5                       #deg
+Omega1 = 0.                     #longnode  deg
+argument1 = np.arccos((0.02)/(np.sqrt(ecc1))) #deg
+
+### from paper 
+mass2 = (10.8 * earth_mass)     #M_sun
+per2 = 11.8993                  #days
+ecc2 = 0.21
+i2 = 91.1                       #deg
+Omega2 = -7.4                   #longnode deg
+argument2 = np.arccos((0.04)/(np.sqrt(ecc2))) #deg
+
+### mean anomaly
+def mean_anomaly(ecc, Omega, argument):
+    ### omega is longitude of periastron (radians)  omega = Omega + argument = longnode + argument
+    Omega = np.deg2rad(Omega)
+    argument = np.deg2rad(argument)
+    omega = Omega + argument
+    f = np.pi/2 - omega
+    ee = 2 * np.arctan(np.tan(f/2) * np.sqrt((1-ecc)/(1+ecc)))  # eccentric anomaly
+    m=ee - ecc*np.sin(ee)
+    m= np.rad2deg(m) #ttvfast takes this in degrees
+    return m
+M1 = mean_anomaly(ecc1, Omega1, argument1)
+M2 = mean_anomaly(ecc2,Omega2, argument2)
+
+
+
+
+planet1 = models.Planet(
+    mass=mass1,                         # M_sun
+    period=per1,                        # days
+    eccentricity=ecc1,
+    inclination=i1,                     # degrees
+    longnode=Omega1,                    # degrees
+    argument=argument1,                 # degrees
+    mean_anomaly=M1,                    # degrees
+)
+
+planet2 = models.Planet(
+    mass=mass2,
+    period=per2,
+    eccentricity=ecc2,
+    inclination=i2,
+    longnode=Omega2,
+    argument=argument2,
+    mean_anomaly=M2,
+)
 #'''
+
+
+''' Original params from example
 stellar_mass = 0.95573417954                    # M_sun
 
 
@@ -57,6 +145,8 @@ planet2 = models.Planet(
     mean_anomaly=-1.9584857031843157e+01,
 )
 '''
+
+''' params for k2-19
 
 stellar_mass = 0.88                    # M_sun
 
@@ -83,11 +173,13 @@ planet2 = models.Planet(
 '''
 
 planets = [planet1, planet2]
-Time = -1045                        # days
+### first transit time from paper (used TC given in paper)
+Time = 2027.9023                  # days
 dt = 0.1                                      # days
-Total = 1700                        # days
+Total = 5500                       # days
 N_step = int((Total-Time) / dt)
-
+#N_step = 1000
+dt = (Total-Time) / N_step
 ### Results dictionary
 results = ttvfast.ttvfast(planets, stellar_mass, Time, dt, Total)
 
@@ -143,6 +235,7 @@ epoch_2_ind = epoch_2 - half_t2
 X1 = epoch_1_ind
 y1 = t_1
 
+''' least squares
 # 1. Define the model function
 def model(params, X):
     slope, intercept = params
@@ -162,12 +255,12 @@ result = least_squares(residuals, initial_guess, args=(epoch_1_ind, t_1))
 slope_1, intercept_1 = result.x
 print(slope_1)
 print(intercept_1)
-
+'''
 # Fit the model using numpy.polyfit
 slope_1, intercept_1 = np.polyfit(X1, y1, 1)
 print(slope_1)
 print(intercept_1)
-assert 1==0
+
 
 # Predict the y values
 y_pred1 = slope_1 * X1 + intercept_1
@@ -192,7 +285,7 @@ residuals2 = y2 - y_pred2
 ### plot 
 plt.scatter(t_1,residuals1,color='orange',label='planet 1 lin')
 plt.scatter(t_2,residuals2,color='blue', label='planet 2 lin')
-plt.title("Linear Regression TTVs")
+plt.title("Linear Regression TTVs - K2-19")
 plt.ylabel('TTV (days)')
 plt.xlabel('Time (days)')
 plt.legend()
@@ -228,7 +321,7 @@ plt.title("Manual TTV Calculation")
 plt.ylabel('TTV (days)')
 plt.xlabel('Time (days)')
 plt.legend()
-plt.show()
+#plt.show()
 
 
 ### slopes and intercepts 

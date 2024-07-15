@@ -49,6 +49,7 @@ print(f'Period: {planet_b_period}')
 print(f'tc: {planet_b_t0}')
 print(f'duration: {planet_b_dur}')
 
+
 ax = lc.fold(period=planet_b_period, epoch_time=planet_b_t0).scatter()
 ax.set_xlim(-5, 5)
 #plt.show()
