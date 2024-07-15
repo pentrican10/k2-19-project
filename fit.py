@@ -9,6 +9,9 @@ from scipy.stats import norm
 from scipy.optimize import minimize
 from scipy.optimize import root_scalar
 from scipy.optimize import least_squares
+from scipy.optimize import curve_fit
+import ttvfast_test
+
 
 ### switch to mask out transits
 mask_transits = True
@@ -45,8 +48,6 @@ def omc(obs_time, t_num, p, tc):
 ### Find the intersection points
 def intersection_func(t): #masked
     return np.interp(t, tc1, chi_sq) - err_threshold
-def intersection_func_lc(t): #unmasked
-    return np.interp(t, tc1, chi_sq_lc) - err_threshold_lc
     
 
 df = read_table(file)
@@ -71,21 +72,52 @@ q2_c = 0.3
 ### generate ttv (lin ephem from params in table 3)
 p_b = 7.920925490169578   ### used linear regression, changed the slope to the one extracted original paper value 7.9222
 tc_b = 2027.9158659031389 ###2027.9023
+# Perform linear regression using numpy.polyfit
+transit_indices = np.array([24, 28, 35, 127, 135, 144, 337, 339, 340, 341, 342, 343, 430, 432])
+transit_t = np.array([2218.0041, 2249.6955, 2305.1505, 3033.8604, 3097.2502, 3168.5368, 4697.28890755,
+                       4713.12745394, 4721.04173821, 4728.95982641, 4736.88095462, 4744.79876123, 5433.87888953, 5449.72028567])
+coefficients, cov_matrix = np.polyfit(transit_indices, transit_t, 1, cov=True)
+
+# Extract slope and intercept
+slope = coefficients[0]
+intercept = coefficients[1]
+
+# Calculate standard errors
+slope_error = np.sqrt(cov_matrix[0, 0])
+intercept_error = np.sqrt(cov_matrix[1, 1])
+print(f"Slope: {slope} ± {slope_error}")
+print(f"Intercept: {intercept} ± {intercept_error}")
+p_b = slope
+err_p_b = slope_error
+tc_b = intercept
+err_tc_b = intercept_error
+
 print(f'Period(paper) b: {p_b}')
 print(f'TC(paper) b: {tc_b}')
 transit_b = [24,28,35,127,135,144]
 predicted_time = []
+err_predicted_time = []
 for i in transit_b:
     ephem = tc_b + i* p_b
+    err_ephem = np.sqrt((i*err_p_b)**2 + (err_tc_b)**2)
     predicted_time.append(ephem)
+    err_predicted_time.append(err_ephem)
 print(f'Predicted times(ephem) b: {predicted_time}')
-
+#print(f'Predicted times error(ephem) b: {err_predicted_time}')
+err_predicted_time = np.array(err_predicted_time)
 pl_b = df[df["Planet"] == "K2-19b"]
-paper_ttv_b = pl_b.Tc.values - predicted_time
-print(f'TC(paper) b: {pl_b.Tc.values}')
+tc_paper = pl_b.Tc.values
+err_tc_paper = pl_b.e_Tc.values
+paper_ttv_b = tc_paper - predicted_time
+err_paper_ttv_b = np.sqrt((err_tc_paper)**2 + (err_predicted_time)**2)
+
+print(f'TC(paper) b: {tc_paper}')
+print(f'TC err(paper) b: {err_tc_paper}')
 print(f'TTV from ephem b: {paper_ttv_b}')
+print(f'TTV error from ephem b: {err_paper_ttv_b}')
 
 ### from BLS in k2-19_project.py
+### since this is from bls, not sure how to get errors
 planet_b_period = 7.9204920492049204
 planet_b_t0 = 2530.2807708159753
 print(f'Period(BLS): {planet_b_period}')
@@ -136,11 +168,17 @@ else:
 
 ### initialize guess times
 transit_num = [0,2,3,4,5,6,93,95]
+### transit num with paper ephem
+t_num_paper = [337,339,340,341,342,343,430,432]
+t_num_paper_c = []
+
 
 tc_guess=[]
 for num in transit_num:
     t = planet_b_t0 + (num * planet_b_period)
     tc_guess.append(t)
+
+
 
 ### transit num with paper ephem
 t_num_paper = [337,339,340,341,342,343,430,432]
@@ -172,9 +210,11 @@ for i in range(len(tc_guess)):
 
 
 tc_chi = np.zeros(len(tc))
+tc_chi_parabola = np.zeros(len(tc))
 ttv = np.zeros(len(tc))
-ttv_lc = np.zeros(len(tc))
+ttv_p = np.zeros(len(tc))
 errors = []
+errors_p = []
 ### plot X^2 vs tc for each guess
 for j in range(len(tc)):
     tc1 = tc[j]
@@ -205,21 +245,6 @@ for j in range(len(tc)):
         chi_sq[i] = (chi_squared)
 
 
-    ### fit parabola to the chisq
-    p_chi_sq = np.polyfit(tc1, chi_sq, 2)  
-
-    ### Extract the coefficients   y = ax^2 + bx + c
-    a_chi_sq, b_chi_sq, c_chi_sq = p_chi_sq
-    
-    ### Find the minimum of the parabola xmin = -b/2a from taking derivative=0
-    tc_best_fit = -b_chi_sq / (2 * a_chi_sq)
-    
-    ### Calculate the minimum chi-squared value
-    chi_sq_min = a_chi_sq * tc_best_fit**2 + b_chi_sq * tc_best_fit + c_chi_sq
-
-    ### Calculate the parabola best fit 
-    p_1 = a_chi_sq*tc1**2 + b_chi_sq*tc1 + c_chi_sq
-    
 
     ### masked
     min_chi_time = tc1[np.argmin(chi_sq)]
@@ -229,10 +254,35 @@ for j in range(len(tc)):
     idx = t_num_paper[j]
     ttv[j] = omc(min_chi_time, idx, p_b, tc_b)#*24 #days to hours
 
+    chi_mask = (chi_sq <= min_chi + 3)
+    fit_mask = (chi_sq <= min_chi + 1)
+
+    ### fit parabola to the chisq
+    p_chi_sq = np.polyfit(tc1[fit_mask], chi_sq[fit_mask], 2)  
+
+    ### Extract the coefficients   y = ax^2 + bx + c
+    a_chi_sq, b_chi_sq, c_chi_sq = p_chi_sq
+    
+    ### Find the minimum of the parabola xmin = -b/2a from taking derivative=0
+    tc_best_fit = -b_chi_sq / (2 * a_chi_sq)
+    
+    ### Calculate the minimum chi-squared value
+    chi_sq_min = a_chi_sq * tc_best_fit**2 + b_chi_sq * tc_best_fit + c_chi_sq
+    tc_chi_parabola[j] = tc_best_fit
+
+    ### Calculate the parabola best fit 
+    p_1 = a_chi_sq*tc1**2 + b_chi_sq*tc1 + c_chi_sq
+
+    ### calculate ttv from parabola fit 
+    ttv_p[j] = omc(tc_best_fit, idx, p_b, tc_b)#*24 #days to hours
+    
+
+    
   
 
     ### delta chisq = 1 gives errors
-    err_threshold = min_chi + 1
+    err_threshold = min_chi + 1 # using chisq discrete minimum
+    err_threshold_p = chi_sq_min + 1 # using minimum of parabola
   
     # Find the intersection using root_scalar
     intersections = []
@@ -243,21 +293,29 @@ for j in range(len(tc)):
                 intersections.append((sol.root - min_chi_time))
     errors.append(intersections)
 
-  
-    plt.plot(tc1, chi_sq,label='chisq')
-    plt.plot(tc1, p_1,label='chisq parabola', color='orange')
-    plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
-    plt.axvline(x=min_chi_time, color='green', linestyle='--', label='Chisq min')
-    plt.axvline(x=tc1[np.argmin(p_1)], color='orange', linestyle='--', label='Chisq min parabola')
+    intersections_p = []
+    for k in range(len(tc1) - 1):
+        if (p_1[k] - err_threshold_p) * (p_1[k + 1] - err_threshold_p) < 0:
+            sol = root_scalar(intersection_func, bracket=[tc1[k], tc1[k + 1]])
+            if sol.converged:
+                intersections_p.append((sol.root - tc_best_fit))
+    errors_p.append(intersections_p)
 
-    # for inter in intersections:
-    #     plt.axvline(x=inter, color='blue', linestyle='--')
-    plt.axhline(y=err_threshold, color='purple', linestyle='--', label='Error Threshold')
-    plt.title(f'Transit {j+1}: Planet b')
-    plt.xlabel('tc')
-    plt.ylabel('X^2')
-    plt.legend()
-    plt.show()
+  
+    # plt.plot(tc1[chi_mask], chi_sq[chi_mask],label='chisq')
+    # plt.plot(tc1[chi_mask], p_1[chi_mask],label='chisq parabola', color='orange')
+    # plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
+    # plt.axvline(x=min_chi_time, linestyle='--', label='Chisq min')
+    # plt.axvline(x=tc1[np.argmin(p_1)], color='orange', linestyle='--', label='Chisq min parabola')
+
+    # # for inter in intersections:
+    # #     plt.axvline(x=inter, color='blue', linestyle='--')
+    # plt.axhline(y=err_threshold, color='green', linestyle='--', label='Error Threshold')
+    # plt.title(f'Transit {j+1}: Planet b')
+    # plt.xlabel('tc')
+    # plt.ylabel('X^2')
+    # plt.legend()
+    # plt.show()
 
 # print(f'Transit Times(TESS) Masked: {tc_chi}')
 # print(f'Transit Times(TESS) Unmasked: {tc_chi_lc}')
@@ -269,24 +327,69 @@ for i in range(len(errors)):
     sig = np.sqrt(errors[i][0]**2 + errors[i][1]**2)
     err_tc_chi.append(sig)
 
+err_tc_chi_p = []
+for i in range(len(errors_p)):
+    sig = np.sqrt(errors_p[i][0]**2 + errors_p[i][1]**2)
+    err_tc_chi_p.append(sig)
+
 ### print values 
 if mask_transits == True:
     print(f'Transit Times(TESS) Masked: {tc_chi}')
     print(f'Avg Errors Masked: {err_tc_chi}')
     print(f'TTV(TESS) Masked: {ttv}')
+
+    print(f'Transit Times(TESS parabola) Masked: {tc_chi_parabola}')
+    print(f'Avg Errors (parabola) Masked: {err_tc_chi_p}')
+    print(f'TTV(TESS parabola) Masked: {ttv_p}')
 else:
     print(f'Transit Times(TESS) Un-Masked: {tc_chi}')
     print(f'Avg Errors Un-Masked: {err_tc_chi}')
     print(f'TTV(TESS) Un-Masked: {ttv}')
 
+    print(f'Transit Times(TESS parabola) Un-Masked: {tc_chi_parabola}')
+    print(f'Avg Errors (parabola) Un-Masked: {err_tc_chi_p}')
+    print(f'TTV(TESS parabola) Un-Masked: {ttv_p}')
 
-plt.scatter(tc_chi, ttv)
-plt.scatter(pl_b.Tc.values, paper_ttv_b)
-#plt.scatter(pl_c.Tc.values, paper_ttv_c)
+# Define a sine function
+def sine_function(t, A, omega, phi, offset):
+    return A * np.sin(omega * t + phi) + offset
 
-plt.title(f'TTV Paper: Planet b')
-plt.xlabel('tc')
-plt.ylabel('TTV value')
+# Concatenate all data points for fitting
+all_times = np.concatenate([tc_chi_parabola, tc_paper])
+all_ttv = np.concatenate([ttv_p, paper_ttv_b])
+all_err_ttv = np.concatenate([err_tc_chi_p, err_paper_ttv_b])
+
+# Initial guess for the parameters: amplitude, frequency, phase, offset
+initial_guess = [0.01, 2*np.pi/365, 0, 0]
+
+# Fit the sine function to the data
+popt, pcov = curve_fit(sine_function, all_times, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
+
+# Extract the fitted parameters
+# add linear slope param +ct to get slope
+A_fit, omega_fit, phi_fit, offset_fit = popt
+
+# Calculate the fitted TTV values
+fitted_ttv = sine_function(all_times, *popt)
+# Plot the fitted sine curve
+t_fit = np.linspace(min(all_times), max(all_times), 1000)
+# Create a figure with two subplots (one above the other)
+fig, (ax1, ax2) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]},sharex=True)
+ax1.plot(t_fit, sine_function(t_fit, *popt), 'r-', label='Fitted sine curve')
+ax1.errorbar(tc_chi_parabola, ttv_p, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='o', capsize=5, label='TESS times')
+ax1.errorbar(tc_paper, paper_ttv_b, xerr=err_tc_paper, yerr=err_paper_ttv_b, fmt='o', capsize=5, label='Paper times')
+ax1.set_title('TTV (chisq parabola): Planet b')
+ax1.set_ylabel('TTV value (days)')
+ax1.legend()
+
+# Plot the residuals in the second subplot
+residuals = all_ttv - fitted_ttv
+ax2.plot(all_times, residuals, 'o')
+ax2.axhline(y=0, color='r', linestyle='-')
+ax2.set_xlabel('TC (days)')
+ax2.set_ylabel('Residuals (days)')
+
+plt.tight_layout()
 plt.show()
 
 
@@ -313,8 +416,8 @@ errors_list = []
 
 # Loop over each tc_guess
 for i in range(len(tc_guess)):
-    ### start lstsq with the chisq guess
-    t0_b = tc_chi[i]
+    ### start lstsq with the chisq guess from parabola
+    t0_b = tc_chi_parabola[i]
     ### Initial guess for parameters
     theta_initial = [t0_b, per_b, rp_b, b_b, T14_b, q1_b, q2_b]
     
@@ -343,11 +446,44 @@ for i in range(len(tc_guess)):
 ### Output results
 tc_lstsq = []
 err_tc_lstsq = []
-print("Optimal Parameters for each guess:")
 for params, errors in zip(optimal_params_list, errors_list):
     tc_lstsq.append(params[0])
     err_tc_lstsq.append(errors[0])
 
+ttv_lstsq = np.zeros(len(tc))
+for j in range(len(tc)):
+    ttv_lstsq[j] = omc(tc_lstsq[j], t_num_paper[j], p_b, tc_b)
+
+# Concatenate all data points for fitting
+all_times = np.concatenate([tc_lstsq, tc_paper])
+all_ttv = np.concatenate([ttv_lstsq, paper_ttv_b])
+all_err_ttv = np.concatenate([err_tc_lstsq, err_paper_ttv_b])
+
+# Initial guess for the parameters: amplitude, frequency, phase, offset
+initial_guess = [0.01, 2*np.pi/365, 0, 0]
+
+# Fit the sine function to the data
+popt, pcov = curve_fit(sine_function, all_times, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
+
+# Extract the fitted parameters
+A_fit, omega_fit, phi_fit, offset_fit = popt
+
+# Calculate the fitted TTV values
+fitted_ttv = sine_function(all_times, *popt)
+# Plot the fitted sine curve
+t_fit = np.linspace(min(all_times), max(all_times), 1000)
+plt.plot(t_fit, sine_function(t_fit, *popt), 'r-', label='Fitted sine curve')
+
+
+### plot ttvs
+plt.errorbar(tc_lstsq, ttv_lstsq,xerr=err_tc_lstsq,yerr = err_tc_lstsq, fmt='o', capsize=5, label='TESS times')
+plt.errorbar(tc_paper, paper_ttv_b,xerr=err_tc_paper, yerr = err_paper_ttv_b, fmt='o', capsize=5, label='paper times')
+#plt.scatter(pl_c.Tc.values, paper_ttv_c)
+plt.title(f'TTV (lstsq): Planet b')
+plt.xlabel('TC (days)')
+plt.ylabel('TTV value (days)')
+plt.legend()
+plt.show()
 
 # print(f'Transit Times(Least Sq) Masked: {tc_lstsq}')
 # print(f'Errors (Least Sq) Masked: {err_tc_lstsq}')
@@ -359,12 +495,16 @@ for params, errors in zip(optimal_params_list, errors_list):
 if mask_transits == True:
     print(f'Transit Times(Least Sq) Masked: {[round(val, 4) for val in tc_lstsq]}')
     print(f'Errors (Least Sq) Masked: {[round(val, 4) for val in err_tc_lstsq]}')
+    print(f'Transit Times(TESS Chi sq parabola) Masked: {[round(val, 4) for val in tc_chi_parabola]}')
+    print(f'Avg Errors (chi sq parabola) Masked: {[round(val, 4) for val in err_tc_chi_p]}')
     print(f'Transit Times(TESS Chi sq) Masked: {[round(val, 4) for val in tc_chi]}')
     print(f'Avg Errors (chi sq) Masked: {[round(val, 4) for val in err_tc_chi]}')
     print(f'TC guess(TESS): {[round(val, 4) for val in tc_guess]}')
 else:
     print(f'Transit Times(Least Sq) Un-Masked: {[round(val, 4) for val in tc_lstsq]}')
     print(f'Errors (Least Sq) Un-Masked: {[round(val, 4) for val in err_tc_lstsq]}')
+    print(f'Transit Times(TESS Chi sq parabola) Un-Masked: {[round(val, 4) for val in tc_chi_parabola]}')
+    print(f'Avg Errors (chi sq parabola) Un-Masked: {[round(val, 4) for val in err_tc_chi_p]}')
     print(f'Transit Times(TESS Chi sq) Un-Masked: {[round(val, 4) for val in tc_chi]}')
     print(f'Avg Errors (chi sq) Un-Masked: {[round(val, 4) for val in err_tc_chi]}')
     print(f'TC guess(TESS): {[round(val, 4) for val in tc_guess]}')
@@ -372,21 +512,24 @@ else:
 transit_index = range(len(tc_lstsq))
 
 ### Loop through each transit index to create individual plots
-for i in transit_index:
-    ### Plot Chi Square with error bars
-    plt.errorbar(i+1, tc_chi[i], yerr=err_tc_chi[i], fmt='s', label='Chi Square', capsize=5)
+# for i in transit_index:
+#     ### Plot Chi Square with error bars
+#     plt.errorbar(i+1, tc_chi[i], yerr=err_tc_chi[i], fmt='s', label='Chi Square', capsize=5)
 
-    ### Plot Least Squares with error bars
-    plt.errorbar(i+1, tc_lstsq[i], yerr=err_tc_lstsq[i], fmt='o', label='Least Squares', capsize=5)
+#     ### Plot chi sq parabola with error bars
+#     plt.errorbar(i+1, tc_chi_parabola[i], yerr=err_tc_chi_p[i], fmt='+', label='Chi Square Parabola', capsize=5)
 
-    ### Plot TC Guess
-    plt.plot(i+1, tc_guess[i], 'x', label='TC Guess')
+#     ### Plot Least Squares with error bars
+#     plt.errorbar(i+1, tc_lstsq[i], yerr=err_tc_lstsq[i], fmt='o', label='Least Squares', capsize=5)
 
-    plt.xlabel('Transit num')
-    plt.ylabel('Transit Times')
-    plt.title(f'Transit Times with Error Bars - Transit {i+1}')
-    plt.legend()
-    plt.show()
+#     ### Plot TC Guess
+#     plt.plot(i+1, tc_guess[i], 'x', label='TC Guess')
+
+#     plt.xlabel('Transit num')
+#     plt.ylabel('Transit Times')
+#     plt.title(f'Transit Times with Error Bars - Transit {i+1}')
+#     plt.legend()
+#     plt.show()
 
 
 ####################################################################################################################
