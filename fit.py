@@ -27,7 +27,7 @@ def read_table(file_name):
     ### Define the column names 
     columns = ["Planet", "Transit", "Inst", "Tc", "e_Tc", "Source"]
 
-    ### Read the text file, specifying space as the delimiter, skipping initial rows
+    ### Read the text file, specifying space as the delimiter, skipping model_guess_omc rows
     df = pd.read_csv(file_path, delim_whitespace=True, skiprows=22, names=columns)
 
     ### Remove NaN values
@@ -94,9 +94,9 @@ tc_b = 2027.9023 #2027.9158659031389 ###2027.9023
 
 print(f'Period(paper) b: {p_b}')
 print(f'TC(paper) b: {tc_b}')
-transit_b = [24,28,35,127,135,144]
+tnum_k2 = [24,28,35,127,135,144]
 predicted_time = []
-for i in transit_b:
+for i in tnum_k2:
     ephem = tc_b + i* p_b
     predicted_time.append(ephem)
 print(f'Predicted times(ephem) b: {predicted_time}')
@@ -165,7 +165,7 @@ else:
 ### initialize guess times
 transit_num = [0,2,3,4,5,6,93,95]
 ### transit num with paper ephem
-t_num_paper = [337,339,340,341,342,343,430,432]
+tnum_tess = [337,339,340,341,342,343,430,432]
 t_num_paper_c = []
 
 
@@ -177,7 +177,7 @@ for num in transit_num:
 
 
 ### transit num with paper ephem
-t_num_paper = [337,339,340,341,342,343,430,432]
+tnum_tess = [337,339,340,341,342,343,430,432]
 t_num_paper_c = []
 
 ### data from lightcurve 
@@ -247,7 +247,7 @@ for j in range(len(tc)):
     min_chi = chi_sq.min()
 
     tc_chi[j] = min_chi_time
-    idx = t_num_paper[j]
+    idx = tnum_tess[j]
     ttv[j] = omc(min_chi_time, idx, p_b, tc_b)#*24 #days to hours
 
     chi_mask = (chi_sq <= min_chi + 3)
@@ -347,42 +347,44 @@ else:
 def sine_function(t, A, omega, phi, p, offset):
     return A * np.sin(omega * t + phi) + (p * t) + offset
 
+### method 1: fit the omc
 # Concatenate all data points for fitting
-all_times = np.concatenate([tc_paper, tc_chi_parabola])
+all_tc = np.concatenate([tc_paper, tc_chi_parabola])
 all_ttv = np.concatenate([ paper_ttv_b, ttv_p])
 all_err_ttv = np.concatenate([err_paper_ttv_b, err_tc_chi_p])
-all_transit_num = np.concatenate([transit_b, t_num_paper])
+all_tnum = np.concatenate([tnum_k2, tnum_tess])
 
-# Initial guess for the parameters: amplitude, frequency, phase, offset
-initial_guess = [0.01, 2*np.pi/365, 0, 0, 0]
+### Initial guess for the parameters: amplitude, frequency, phase, period, offset
+initial_guess = [0.07, 2*np.pi/700, -np.pi/2, -0.00017,  0.403]
 
-# Fit the sine function to the data
-#popt, pcov = curve_fit(sine_function, all_times, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
-popt, pcov = curve_fit(sine_function, all_times, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
+### Fit the sine function to the data
+popt, pcov = curve_fit(sine_function, all_tc, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
 
-# Extract the fitted parameters
-# add linear slope param +ct to get slope
+### Extract the fitted parameters
 A_fit, omega_fit, phi_fit, p, offset_fit = popt
 print(f'offset: {offset_fit}')
 print(f'p: {p}')
 
 ### Calculate the fitted TTV values
-fitted_ttv = sine_function(all_times, *popt) 
-t_fit = np.linspace(min(all_times), max(all_times), 1000)
+fitted_ttv = sine_function(all_tc, *popt) 
+tc_plot = np.linspace(min(all_tc), max(all_tc), 1000)
 ### Create a figure with two subplots (one above the other)
 fig, (ax1, ax2) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]},sharex=True)
-normalized_sine = sine_function(t_fit, *popt) - (p*t_fit) - offset_fit
-norm_chi_ttv = ttv_p - (p*tc_chi_parabola) - offset_fit
-norm_paper_ttv = paper_ttv_b - (p*tc_paper) - offset_fit
+model_sine_omc = sine_function(tc_plot, *popt) - (p*tc_plot) - offset_fit
+ttv_chi_fit_omc = ttv_p - (p*tc_chi_parabola) - offset_fit
+ttv_paper_fit_omc = paper_ttv_b - (p*tc_paper) - offset_fit
 
-ax1.plot(t_fit, normalized_sine, 'r-', label='Fitted sine curve')
-ax1.errorbar(tc_chi_parabola, norm_chi_ttv, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='bo', capsize=5, label='TESS times')
-ax1.errorbar(tc_paper, norm_paper_ttv, xerr=err_tc_paper, yerr=err_paper_ttv_b, fmt='bs', capsize=5, label='Paper times')
-ax1.set_title('TTV (chisq parabola): Planet b')
+model_guess_omc = sine_function(tc_plot,*initial_guess) - (initial_guess[3]*tc_plot) - initial_guess[4]
+
+ax1.plot(tc_plot, model_sine_omc, 'r-', label='Fitted sine curve')
+ax1.plot(tc_plot,model_guess_omc, label='Initial Guess')
+ax1.errorbar(tc_chi_parabola, ttv_chi_fit_omc, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='bo', capsize=5, label='TESS times')
+ax1.errorbar(tc_paper, ttv_paper_fit_omc, xerr=err_tc_paper, yerr=err_paper_ttv_b, fmt='bs', capsize=5, label='Paper times')
+ax1.set_title('TTV Fit OMC: Planet b')
 ax1.set_ylabel('TTV value (days)')
 ax1.legend()
 
-# Plot the residuals in the second subplot
+### Plot the residuals in the second subplot
 residuals = all_ttv - fitted_ttv
 residuals_paper = (paper_ttv_b - sine_function(tc_paper, *popt)) / err_paper_ttv_b
 residuals_TESS = (ttv_p - sine_function(tc_chi_parabola, *popt)) / err_tc_chi_p
@@ -397,60 +399,78 @@ ax2.set_ylim(-1.1 * residual_range, 1.1 * residual_range)
 plt.tight_layout()
 plt.show()
 
+### plot fit with ttvfast
 from ttvfast_test import t_1, residuals1, t_2, residuals2
-#fig, (ax1, ax2) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]},sharex=True)
 plt.scatter(t_1,residuals1,color='orange',s=4,label='planet b ttvfast')
 plt.scatter(t_2,residuals2,color='blue',s=4, label='planet c ttvfast')
-plt.errorbar(tc_chi_parabola, norm_chi_ttv, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='ro', capsize=5, label='TESS times b')
-plt.errorbar(tc_paper, norm_paper_ttv, xerr=err_tc_paper, yerr=err_paper_ttv_b, fmt='rs', capsize=5, label='Paper times b')
-plt.plot(t_fit, normalized_sine,color='black', label='Fitted sine curve b')
+plt.errorbar(tc_chi_parabola, ttv_chi_fit_omc, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='ro', capsize=5, label='TESS times b')
+plt.errorbar(tc_paper, ttv_paper_fit_omc, xerr=err_tc_paper, yerr=err_paper_ttv_b, fmt='rs', capsize=5, label='Paper times b')
+plt.plot(tc_plot, model_sine_omc,color='black', label='OMC Fitted Sine')
 plt.title("TTVfast and Measured Times - K2-19")
 plt.ylabel('TTV (days)')
+plt.xlabel('TC (days)')
 plt.legend()
 plt.show()
 
 
-### method 2
-# Initial guess for the parameters: amplitude, frequency, phase, offset
-initial_guess2 = [0.01, 2*np.pi/365, 0, 7.9222, 2027.9023]
+### method 2: fit the transit times and indices directly
+### Initial guess for the parameters: amplitude, frequency, phase, period, offset
+initial_guess2 = [0.07, 2*np.pi/100, -np.pi/2, 7.92089, 2027.84470]
 
 # Fit the sine function to the data
-popt2, pcov2 = curve_fit(sine_function, all_transit_num, all_times, p0=initial_guess2, sigma=all_err_ttv, absolute_sigma=True)
-A_fit2, omega_fit2, phi_fit2, p2, offset_fit2 = popt2
+popt2, pcov2 = curve_fit(sine_function, all_tnum, all_tc, p0=initial_guess2, sigma=all_err_ttv, absolute_sigma=True)
+A_fit2, omega_fit2, phi_fit2, p2_fit, offset_fit2 = popt2
 print(f'offset2: {offset_fit2}')
-print(f'p2: {p2}')
+print(f'p2_fit: {p2_fit}')
 
-transit_b = np.array(transit_b,dtype='float64')
-t_num_paper = np.array(t_num_paper,dtype='float64')
+tnum_k2 = np.array(tnum_k2,dtype='float64')
+tnum_tess = np.array(tnum_tess,dtype='float64')
 
 ### Calculate the fitted TTV values
-# fitted_ttv = sine_function(all_times, *popt2) 
-t_fit2 = np.linspace(min(all_transit_num), max(all_transit_num), 1000)
-### Create a figure with two subplots (one above the other)
+tnum_plot = np.linspace(min(all_tnum), max(all_tnum), 1000)
+
+def ephem_fit(tnum):
+    return (p2_fit*tnum) + offset_fit2
+def ephem_guess(tnum):
+    return (initial_guess2[3]*tnum) + initial_guess2[4]
+
+model_fit_sine_simul = sine_function(tnum_plot, *popt2) - ephem_fit(tnum_plot)
+
+ttv_chi_parabola_simul = tc_chi_parabola - ephem_fit(tnum_tess)
+ttv_paper_simul = tc_paper - ephem_fit(tnum_k2)
+
+model_guess_simul = sine_function(tnum_plot,*initial_guess2) - ephem_fit(tnum_plot)
+
 fig2, (ax3, ax4) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]},sharex=True)
-normalized_sine2 = sine_function(t_fit2, *popt2) - (p2*t_fit2) - offset_fit2
-norm_tc_chi_parabola = tc_chi_parabola - (p2*t_num_paper) - offset_fit2
-norm_tc_paper = tc_paper - (p2*transit_b) - offset_fit2
-
-
-ax3.plot(t_fit2,normalized_sine2, 'r-', label='Fitted sine curve')
-ax3.errorbar(t_num_paper, norm_tc_chi_parabola, yerr=err_tc_chi_p, fmt='bo', capsize=5, label='TESS times')
-ax3.errorbar(transit_b, norm_tc_paper, yerr=err_tc_paper, fmt='bs', capsize=5, label='Paper times')
-ax3.set_title('Times: Planet b')
-ax3.set_ylabel('times (days)')
-ax3.set_xlabel('transit number')
+ax3.plot(ephem_fit(tnum_plot), model_guess_simul, label='model_guess_omc guess')
+ax3.plot(ephem_fit(tnum_plot), model_fit_sine_simul, 'r-', label='Fitted sine curve')
+ax3.errorbar(ephem_fit(tnum_tess), ttv_chi_parabola_simul, yerr=err_tc_chi_p, fmt='bo', capsize=5, label='TESS times')
+ax3.errorbar(ephem_fit(tnum_k2), ttv_paper_simul, yerr=err_tc_paper, fmt='bs', capsize=5, label='Paper times')
+ax3.set_title('TTV Fit Simultaneous: Planet b')
+ax3.set_ylabel('TTV (days)')
 ax3.legend()
 
-transit_b = np.asarray(transit_b, dtype='float64')
-residual_paper = tc_paper - sine_function(transit_b, *popt2)
-residual_tess = tc_chi_parabola - sine_function(t_num_paper, *popt2)
-ax4.plot(transit_b, residual_paper, 'bs')
-ax4.plot(t_num_paper, residual_tess, 'bo')
+residual_paper = (ttv_paper_simul - sine_function(tnum_k2, *popt2) + ephem_fit(tnum_k2)) / err_tc_paper
+residual_tess = (ttv_chi_parabola_simul - sine_function(tnum_tess, *popt2) + ephem_fit(tnum_tess)) / err_tc_chi_p
+ax4.plot(ephem_fit(tnum_k2), residual_paper, 'bs')
+ax4.plot(ephem_fit(tnum_tess), residual_tess, 'bo')
 ax4.axhline(y=0, color='r', linestyle='-')
-ax4.set_ylabel('Residuals (days)')
-
-
+ax4.set_ylabel('Norm Residuals (days)')
+ax4.set_xlabel('TC (days)')
 plt.show()
+
+
+plt.scatter(t_1,residuals1,color='orange',s=4,label='planet b ttvfast')
+plt.scatter(t_2,residuals2,color='blue',s=4, label='planet c ttvfast')
+plt.errorbar(tc_chi_parabola, ttv_chi_parabola_simul, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='ro', capsize=5, label='TESS times b')
+plt.errorbar(tc_paper, ttv_paper_simul, xerr=err_tc_paper, yerr=err_paper_ttv_b, fmt='rs', capsize=5, label='Paper times b')
+plt.plot(tc_plot, model_fit_sine_simul,color='black', label='Simult Fitted Sine')
+plt.title("TTVfast and Measured Times - K2-19")
+plt.ylabel('TTV (days)')
+plt.xlabel('TC (days)')
+plt.legend()
+plt.show()
+
 #######################################################################################################################
 
 ### Function to generate the transit model
@@ -510,10 +530,10 @@ for params, errors in zip(optimal_params_list, errors_list):
 
 ttv_lstsq = np.zeros(len(tc))
 for j in range(len(tc)):
-    ttv_lstsq[j] = omc(tc_lstsq[j], t_num_paper[j], p_b, tc_b)
+    ttv_lstsq[j] = omc(tc_lstsq[j], tnum_tess[j], p_b, tc_b)
 
 # Concatenate all data points for fitting
-all_times = np.concatenate([tc_lstsq, tc_paper])
+all_tc = np.concatenate([tc_lstsq, tc_paper])
 all_ttv = np.concatenate([ttv_lstsq, paper_ttv_b])
 all_err_ttv = np.concatenate([err_tc_lstsq, err_paper_ttv_b])
 
@@ -521,16 +541,16 @@ all_err_ttv = np.concatenate([err_tc_lstsq, err_paper_ttv_b])
 initial_guess = [0.01, 2*np.pi/365, 0,0, 0]
 
 # Fit the sine function to the data
-popt, pcov = curve_fit(sine_function, all_times, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
+popt, pcov = curve_fit(sine_function, all_tc, all_ttv, p0=initial_guess, sigma=all_err_ttv, absolute_sigma=True)
 
 # Extract the fitted parameters
 A_fit, omega_fit, phi_fit, p, offset_fit = popt
 
 # Calculate the fitted TTV values
-fitted_ttv = sine_function(all_times, *popt)
+fitted_ttv = sine_function(all_tc, *popt)
 # Plot the fitted sine curve
-t_fit = np.linspace(min(all_times), max(all_times), 1000)
-plt.plot(t_fit, sine_function(t_fit, *popt), 'r-', label='Fitted sine curve')
+tc_plot = np.linspace(min(all_tc), max(all_tc), 1000)
+plt.plot(tc_plot, sine_function(tc_plot, *popt), 'r-', label='Fitted sine curve')
 
 
 ### plot ttvs
@@ -647,7 +667,7 @@ t0_b = 	2530
 q1_b = 0.4
 q2_b = 0.3
 theta_initial = [t0_b, per_b, rp_b, b_b, T14_b, q1_b, q2_b]
-# Calculate log-likelihood for initial parameters
+# Calculate log-likelihood for model_guess_omc parameters
 #lg_like = log_likelihood(theta_initial, time, flux, flux_err)
 
 

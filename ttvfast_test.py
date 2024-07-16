@@ -177,7 +177,7 @@ planet2 = models.Planet(
 
 planets = [planet1, planet2]
 ### first transit time from paper (used TC given in paper)
-Time = 1950 #value of start time from paper                # days
+Time = 2020 #value of start time from paper                # days
 dt = 0.1                                      # days
 Total = 5500                       # days
 N_step = int((Total-Time) / dt)
