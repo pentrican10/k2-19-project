@@ -34,7 +34,7 @@ def read_table(file_name):
     df = df.dropna()
     return df
 
-def convert_time(times):
+def convert_time_t2p(times):
     ### TESS offset 
     BTJD = times + 2457000
     new_time = BTJD - 2454833
@@ -59,45 +59,21 @@ T14_b = 3.237 * 0.0416667  # convert to days
 b_b = 0.17
 q1_b = 0.4
 q2_b = 0.3
-
-per_c = 11.8993
-rp_c = 0.0458
-T14_c = 3.823 * 0.0416667
-b_c = 0.630
-q1_c = 0.4
-q2_c = 0.3  
+ 
 
 #########################################################################################################################################
 
 ### generate ttv (lin ephem from params in table 3)
-p_b = 7.9222 #7.920925490169578   ### used linear regression, changed the slope to the one extracted original paper value 7.9222
-tc_b = 2027.9023 #2027.9158659031389 ###2027.9023
-# Perform linear regression using numpy.polyfit
-# transit_indices = np.array([24, 28, 35, 127, 135, 144, 337, 339, 340, 341, 342, 343, 430, 432])
-# transit_t = np.array([2218.0041, 2249.6955, 2305.1505, 3033.8604, 3097.2502, 3168.5368, 4697.28890755,
-#                        4713.12745394, 4721.04173821, 4728.95982641, 4736.88095462, 4744.79876123, 5433.87888953, 5449.72028567])
-# coefficients, cov_matrix = np.polyfit(transit_indices, transit_t, 1, cov=True)
+period_b_petigura = 7.9222 #7.920925490169578   ### used linear regression, changed the slope to the one extracted original paper value 7.9222
+tc_b_petigura = 2027.9023 #2027.9158659031389 ###2027.9023
 
-# # Extract slope and intercept
-# slope = coefficients[0]
-# intercept = coefficients[1]
 
-# # Calculate standard errors
-# slope_error = np.sqrt(cov_matrix[0, 0])
-# intercept_error = np.sqrt(cov_matrix[1, 1])
-# print(f"Slope: {slope} ± {slope_error}")
-# print(f"Intercept: {intercept} ± {intercept_error}")
-# p_b = slope
-# err_p_b = slope_error
-# tc_b = intercept
-# err_tc_b = intercept_error
-
-print(f'Period(paper) b: {p_b}')
-print(f'TC(paper) b: {tc_b}')
+print(f'Period(paper) b: {period_b_petigura}')
+print(f'TC(paper) b: {tc_b_petigura}')
 tnum_k2 = [24,28,35,127,135,144]
 predicted_time = []
 for i in tnum_k2:
-    ephem = tc_b + i* p_b
+    ephem = tc_b_petigura + i* period_b_petigura
     predicted_time.append(ephem)
 print(f'Predicted times(ephem) b: {predicted_time}')
 #print(f'Predicted times error(ephem) b: {err_predicted_time}')
@@ -114,25 +90,15 @@ print(f'TTV error from ephem b: {err_paper_ttv_b}')
 
 ### from BLS in k2-19_project.py
 ### since this is from bls, not sure how to get errors
-planet_b_period = 7.9204920492049204
-planet_b_t0 = 2530.2807708159753
-print(f'Period(BLS): {planet_b_period}')
-print(f'Tc(BLS): {planet_b_t0}')
+from k2_19_project import planet_b_period, planet_b_t0
+# period_b_bls = 7.9204920492049204
+# tc_b_bls = 2530.2807708159753
+period_b_bls = planet_b_period.value
+tc_b_bls = planet_b_t0.value
 
-### planet c
-p_c = 11.8993
-tc_c = 2020.0007
-transit_c = [84, 99]
-predicted_time_c=[]
-for i in transit_c:
-    ephem = tc_c + i* p_c
-    predicted_time_c.append(ephem)
-print(f'Predicted times(ephem) c: {predicted_time_c}')
+print(f'Period(BLS): {period_b_bls}')
+print(f'Tc(BLS): {tc_b_bls}')
 
-pl_c = df[df["Planet"] == "K2-19c"]
-paper_ttv_c = pl_c.Tc.values - predicted_time_c
-print(f'TC(paper) c: {pl_c.Tc.values}')
-print(f'TTV from ephem c: {paper_ttv_c}')
 
 ##########################################################################################################################################
 
@@ -145,7 +111,7 @@ if mask_transits == True:
     transit_times = [4697.28834658, 4713.12933068, 4721.03972171, 4728.96021376, 4736.88070581, 4744.80119786, 5433.87895563, 5449.71993973]
     masked_lc = lc
 
-    times = convert_time(masked_lc.time.value)
+    times = convert_time_t2p(masked_lc.time.value)
 
     ### Initialize a mask with all False values (i.e., include all data points initially)
     mask = np.zeros_like(times, dtype=bool)
@@ -166,35 +132,30 @@ else:
 transit_num = [0,2,3,4,5,6,93,95]
 ### transit num with paper ephem
 tnum_tess = [337,339,340,341,342,343,430,432]
-t_num_paper_c = []
 
 
 tc_guess=[]
 for num in transit_num:
-    t = planet_b_t0 + (num * planet_b_period)
+    t = tc_b_bls + (num * period_b_bls)
     tc_guess.append(t)
+# for num in tnum_tess:
+#     t = tc_b_petigura + (num * period_b_petigura)
+#     tc_guess.append(t)
 
-
-
-### transit num with paper ephem
-tnum_tess = [337,339,340,341,342,343,430,432]
-t_num_paper_c = []
 
 ### data from lightcurve 
 time_tess = np.array(lc.time.value)
 flux=np.array(lc.flux)
 flux_err = np.array(lc.flux_err)
 
-time = convert_time(time_tess)
-tc_guess = convert_time(np.array(tc_guess))
+time = convert_time_t2p(time_tess)
+tc_guess = convert_time_t2p(np.array(tc_guess))
 tc_guess = np.array(tc_guess)
 print(f'TC guess(TESS): {tc_guess}')
 
 
-
 ### set range for search: [#hours] * [days per hour]
 ttv_hour = 2* 0.0416667 # 1 hour to days
-#tc_guess = (2530.28, 2546.12, 2554.04, 2561.96, 2569.88, 2577.8, 3266.84, 3282.68)
 
 ### get tc ranges 
 tc = []
@@ -247,8 +208,10 @@ for j in range(len(tc)):
     min_chi = chi_sq.min()
 
     tc_chi[j] = min_chi_time
-    idx = tnum_tess[j]
-    ttv[j] = omc(min_chi_time, idx, p_b, tc_b)#*24 #days to hours
+    # idx = tnum_tess[j]
+    # ttv[j] = omc(min_chi_time, idx, period_b_petigura, tc_b_petigura)#*24 #days to hours
+    idx = transit_num[j]
+    ttv[j] = omc(min_chi_time, idx, period_b_bls, tc_b_bls)#*24 #days to hours
 
     chi_mask = (chi_sq <= min_chi + 3)
     fit_mask = (chi_sq <= min_chi + 1)
@@ -270,7 +233,8 @@ for j in range(len(tc)):
     p_1 = a_chi_sq*tc1**2 + b_chi_sq*tc1 + c_chi_sq
 
     ### calculate ttv from parabola fit 
-    ttv_p[j] = omc(tc_best_fit, idx, p_b, tc_b)#*24 #days to hours
+    # ttv_p[j] = omc(tc_best_fit, idx, period_b_petigura, tc_b_petigura)#*24 #days to hours
+    ttv_p[j] = omc(tc_best_fit, idx, period_b_bls, tc_b_bls)#*24 #days to hours
     
 
     
@@ -343,6 +307,11 @@ else:
     print(f'Avg Errors (parabola) Un-Masked: {err_tc_chi_p}')
     print(f'TTV(TESS parabola) Un-Masked: {ttv_p}')
 
+
+
+'''
+################################################################################################################
+
 # Define a sine function
 def sine_function(t, A, omega, phi, p, offset):
     return A * np.sin(omega * t + phi) + (p * t) + offset
@@ -352,7 +321,8 @@ def sine_function(t, A, omega, phi, p, offset):
 all_tc = np.concatenate([tc_paper, tc_chi_parabola])
 all_ttv = np.concatenate([ paper_ttv_b, ttv_p])
 all_err_ttv = np.concatenate([err_paper_ttv_b, err_tc_chi_p])
-all_tnum = np.concatenate([tnum_k2, tnum_tess])
+# all_tnum = np.concatenate([tnum_k2, tnum_tess])
+all_tnum = np.concatenate([tnum_k2, transit_num])
 
 ### Initial guess for the parameters: amplitude, frequency, phase, period, offset
 initial_guess = [0.07, 2*np.pi/700, -np.pi/2, -0.00017,  0.403]
@@ -426,7 +396,8 @@ print(f'offset2: {offset_fit2}')
 print(f'p2_fit: {p2_fit}')
 
 tnum_k2 = np.array(tnum_k2,dtype='float64')
-tnum_tess = np.array(tnum_tess,dtype='float64')
+# tnum_tess = np.array(tnum_tess,dtype='float64')
+transit_num = np.array(transit_num,dtype='float64')
 
 ### Calculate the fitted TTV values
 tnum_plot = np.linspace(min(all_tnum), max(all_tnum), 1000)
@@ -438,7 +409,8 @@ def ephem_guess(tnum):
 
 model_fit_sine_simul = sine_function(tnum_plot, *popt2) - ephem_fit(tnum_plot)
 
-ttv_chi_parabola_simul = tc_chi_parabola - ephem_fit(tnum_tess)
+# ttv_chi_parabola_simul = tc_chi_parabola - ephem_fit(tnum_tess)
+ttv_chi_parabola_simul = tc_chi_parabola - ephem_fit(transit_num)
 ttv_paper_simul = tc_paper - ephem_fit(tnum_k2)
 
 model_guess_simul = sine_function(tnum_plot,*initial_guess2) - ephem_fit(tnum_plot)
@@ -446,16 +418,20 @@ model_guess_simul = sine_function(tnum_plot,*initial_guess2) - ephem_fit(tnum_pl
 fig2, (ax3, ax4) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]},sharex=True)
 ax3.plot(ephem_fit(tnum_plot), model_guess_simul, label='model_guess_omc guess')
 ax3.plot(ephem_fit(tnum_plot), model_fit_sine_simul, 'r-', label='Fitted sine curve')
-ax3.errorbar(ephem_fit(tnum_tess), ttv_chi_parabola_simul, yerr=err_tc_chi_p, fmt='bo', capsize=5, label='TESS times')
+# ax3.errorbar(ephem_fit(tnum_tess), ttv_chi_parabola_simul, yerr=err_tc_chi_p, fmt='bo', capsize=5, label='TESS times')
+ax3.errorbar(ephem_fit(transit_num), ttv_chi_parabola_simul, yerr=err_tc_chi_p, fmt='bo', capsize=5, label='TESS times')
 ax3.errorbar(ephem_fit(tnum_k2), ttv_paper_simul, yerr=err_tc_paper, fmt='bs', capsize=5, label='Paper times')
 ax3.set_title('TTV Fit Simultaneous: Planet b')
 ax3.set_ylabel('TTV (days)')
 ax3.legend()
 
 residual_paper = (ttv_paper_simul - sine_function(tnum_k2, *popt2) + ephem_fit(tnum_k2)) / err_tc_paper
-residual_tess = (ttv_chi_parabola_simul - sine_function(tnum_tess, *popt2) + ephem_fit(tnum_tess)) / err_tc_chi_p
+# residual_tess = (ttv_chi_parabola_simul - sine_function(tnum_tess, *popt2) + ephem_fit(tnum_tess)) / err_tc_chi_p
+residual_tess = (ttv_chi_parabola_simul - sine_function(transit_num, *popt2) + ephem_fit(transit_num)) / err_tc_chi_p
+
 ax4.plot(ephem_fit(tnum_k2), residual_paper, 'bs')
-ax4.plot(ephem_fit(tnum_tess), residual_tess, 'bo')
+ax4.plot(ephem_fit(transit_num), residual_tess, 'bo')
+# ax4.plot(ephem_fit(tnum_tess), residual_tess, 'bo')
 ax4.axhline(y=0, color='r', linestyle='-')
 ax4.set_ylabel('Norm Residuals (days)')
 ax4.set_xlabel('TC (days)')
@@ -532,7 +508,8 @@ for params, errors in zip(optimal_params_list, errors_list):
 
 ttv_lstsq = np.zeros(len(tc))
 for j in range(len(tc)):
-    ttv_lstsq[j] = omc(tc_lstsq[j], tnum_tess[j], p_b, tc_b)
+    # ttv_lstsq[j] = omc(tc_lstsq[j], tnum_tess[j], period_b_petigura, tc_b_petigura)
+    ttv_lstsq[j] = omc(tc_lstsq[j], transit_num[j], period_b_bls, tc_b_bls)
 
 # Concatenate all data points for fitting
 all_tc = np.concatenate([tc_lstsq, tc_paper])
@@ -606,5 +583,6 @@ transit_index = range(len(tc_lstsq))
 #     plt.show()
 
 
+'''
 
 

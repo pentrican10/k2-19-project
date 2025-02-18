@@ -21,9 +21,6 @@ df = pd.read_csv(file_path, delim_whitespace=True, skiprows=22, names=columns)
 ### Remove NaN values
 df = df.dropna()
 
-# ### Display the DataFrame
-# #print(df)
-
 # Download the light curve data
 lc = lk.search_lightcurve("K2-19",author = 'SPOC').download_all()
 
@@ -39,16 +36,18 @@ flux_err = lc.flux_err
 period = np.linspace(1, 20, 10000)
 # Create a BLSPeriodogram
 bls = lc.to_periodogram(method='bls', period=period, frequency_factor=500)
-bls.plot()
+#bls.plot()
 
 planet_b_period = bls.period_at_max_power
 planet_b_t0 = bls.transit_time_at_max_power
 planet_b_dur = bls.duration_at_max_power
-# Check the value for period
-print(f'Period: {planet_b_period}')
-print(f'tc: {planet_b_t0}')
-print(f'duration: {planet_b_dur}')
 
+
+'''
+# Check the value for period
+print(f'Period b: {planet_b_period}')
+print(f'tc b: {planet_b_t0}')
+print(f'duration b: {planet_b_dur}')
 
 ax = lc.fold(period=planet_b_period, epoch_time=planet_b_t0).scatter()
 ax.set_xlim(-5, 5)
@@ -86,7 +85,7 @@ planet_c_dur = bls.duration_at_max_power
 print(planet_c_period)
 print(planet_c_t0)
 print(planet_c_dur)
-assert 1==0
+
 ax = masked_lc.fold(planet_c_period, planet_c_t0).scatter()
 masked_lc.fold(planet_c_period, planet_c_t0).bin(.1).plot(ax=ax, c='r', lw=2,
                                                           label='Binned Flux')
@@ -102,4 +101,4 @@ planet_c_model.plot(ax=ax, c='r', label='Planet c Transit Model')
 
 
 plt.show()
-
+'''

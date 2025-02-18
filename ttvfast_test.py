@@ -115,65 +115,7 @@ planet2 = models.Planet(
     argument=argument2,
     mean_anomaly=M2,
 )
-#'''
-# print(f'planet 1 mass: {planet1.mass}')
-# print(f'planet 2 mass: {planet2.mass}')
-# print(f'planet 1 period: {planet1.period}')
-# print(f'planet 2 period: {planet2.period}')
 
-
-
-
-''' Original params from example
-stellar_mass = 0.95573417954                    # M_sun
-
-
-planet1 = models.Planet(
-    mass=0.00002878248,                         # M_sun
-    period=1.0917340278625494e+01,              # days
-    eccentricity=5.6159310042858110e-02,
-    inclination=9.0921164935951211e+01,         # degrees
-    longnode=-1.1729336712101943e-18,           # degrees
-    argument=1.8094838714599581e+02,            # degrees
-    mean_anomaly=-8.7093652691581923e+01,       # degrees
-)
-
-planet2 = models.Planet(
-    mass=0.00061895914,
-    period=2.2266898036209028e+01,
-    eccentricity=5.6691301931178648e-02,
-    inclination=8.7598285693573246e+01,
-    longnode=4.6220554014026838e-01,
-    argument=1.6437004273382669e+00,
-    mean_anomaly=-1.9584857031843157e+01,
-)
-'''
-
-''' params for k2-19
-
-stellar_mass = 0.88                    # M_sun
-
-
-planet1 = models.Planet(
-    mass=(0.0777 * stellar_mass),               # M_sun
-    period=7.9222,                              # days
-    eccentricity=0.20,
-    inclination=91.5,                           # degrees
-    longnode= 0.,                   #fixed      # degrees
-    argument=1.8094838714599581e+02,            # degrees
-    mean_anomaly=-8.7093652691581923e+01,       # degrees
-)
-
-planet2 = models.Planet(
-    mass=(0.0458 * stellar_mass),
-    period=11.8993,
-    eccentricity=0.21,
-    inclination=91.1,
-    longnode=-7.4, 
-    argument=1.6437004273382669e+00,
-    mean_anomaly=-1.9584857031843157e+01,
-)
-'''
 
 planets = [planet1, planet2]
 ### first transit time from paper (used TC given in paper)
@@ -196,19 +138,6 @@ vsky_values = np.array(results['positions'][4])
 ### finding index where the time values end and -2. fills rest of array
 time_end = np.where(times_ == -2.)[0][0]
 
-
-'''
-# ### Reverse the array
-# reversed_array = planet_ind[::-1]
-
-# ### Find the first occurrence of 1 in the reversed array
-# first_occurrence_reversed =  np.where(reversed_array == 1)[0][0]
-
-# ### Calculate the index in the original array
-# original_index = len(planet_ind) - 1 - first_occurrence_reversed
-# print(original_index)
-# time_end = original_index
-'''
 ### trim the arrays
 planet_ind = planet_ind[:time_end]
 epoch_int = epoch_int[:time_end]
@@ -238,39 +167,15 @@ epoch_2_ind = epoch_2 - half_t2
 X1 = epoch_1_ind
 y1 = t_1
 
-''' least squares
-# 1. Define the model function
-def model(params, X):
-    slope, intercept = params
-    return slope * X + intercept
 
-# 2. Define the residuals function
-def residuals(params, X, y):
-    return y - model(params, X)
-
-# Initial guess for parameters (slope, intercept)
-initial_guess = [1.0, 0.0]
-
-# 3. Use least_squares to find optimal parameters
-result = least_squares(residuals, initial_guess, args=(epoch_1_ind, t_1))
-
-# Extract the optimal parameters
-slope_1, intercept_1 = result.x
-print(slope_1)
-print(intercept_1)
-'''
 # Fit the model using numpy.polyfit
 slope_1, intercept_1 = np.polyfit(X1, y1, 1)
-# print(slope_1)
-# print(intercept_1)
-
 
 # Predict the y values
 y_pred1 = slope_1 * X1 + intercept_1
 
 # Calculate residuals
 residuals1 = y1 - y_pred1
-
 
 ### linear regression planet2
 X2 = epoch_2_ind
@@ -312,25 +217,6 @@ for i in range(len(epoch_2_ind)):
 
 omc1 = t_1 - expected_time_1
 omc2 = t_2 - expected_time_2
-# plt.plot(t_1,omc1, color='orange',label='planet 1 omc')
-# plt.plot(t_2,omc2, color='blue', label='planet 2 omc')
-# plt.title("Manual TTV Calculation")
-# plt.ylabel('TTV (days)')
-# plt.xlabel('Time (days)')
-# plt.legend()
-# plt.show()
-
-
-### slopes and intercepts 
-### simulation periods 
-# print(f'Simulation period 1: {period_sim1}')
-# print(f'Simulation period 2: {period_sim2}')
-
-# ### linear regression periods
-# print(f'Linear regression Slope 1: {slope_1}')
-# print(f'Linear regression Intercept 1: {intercept_1}')
-# print(f'Linear regression Slope 2: {slope_2}')
-# print(f'Linear regression Intercept 2: {intercept_2}')
 
 
 def ttvfast_omc(planets):
