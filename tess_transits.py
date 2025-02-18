@@ -291,6 +291,7 @@ for i in range(len(errors_p)):
     sig = np.sqrt(errors_p[i][0]**2 + errors_p[i][1]**2)
     err_tc_chi_p.append(sig)
 
+'''
 ### print values 
 if mask_transits == True:
     print(f'Transit Times(TESS) Masked: {tc_chi}')
@@ -308,7 +309,7 @@ else:
     print(f'Transit Times(TESS parabola) Un-Masked: {tc_chi_parabola}')
     print(f'Avg Errors (parabola) Un-Masked: {err_tc_chi_p}')
     print(f'TTV(TESS parabola) Un-Masked: {ttv_p}')
-
+'''
 
 # Initialize empty list for storing results
 results = []
@@ -316,6 +317,7 @@ results = []
 # Loop through the transits and collect the data dynamically
 for j in range(len(tc)):
     # Assuming these variables are calculated inside your loop
+    transit = transit_num[j]
     transit_time = tc_chi[j]
     avg_error = err_tc_chi[j]
     ttv_value = ttv[j]
@@ -326,13 +328,16 @@ for j in range(len(tc)):
     # Create a dictionary for the current row
     row = {
         'Planet': 'k2-19b',
+        'Transit': transit,
         'Tc(TESS)': transit_time,
         'Tc_err': avg_error,
         'TTV(TESS)': ttv_value,
         'Tc(TESS) Parabola': transit_time_parabola,
         'Tc_err Parabola': avg_error_parabola,
         'TTV(TESS) Parabola': ttv_value_parabola,
-        'Time Offset': 'BJD - 2454833'
+        'Time Offset': 'BJD - 2454833',
+        'Period': period_b_bls,
+        'Tc_offset': tc_b_bls
     }
 
     # Append the row to the results list
