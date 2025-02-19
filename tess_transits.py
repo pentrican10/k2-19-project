@@ -90,7 +90,7 @@ print(f'TTV error from ephem b: {err_paper_ttv_b}')
 
 ### from BLS in k2-19_project.py
 ### since this is from bls, not sure how to get errors
-from k2_19_project import planet_b_period, planet_b_t0
+from bls_fit import planet_b_period, planet_b_t0
 # period_b_bls = 7.9204920492049204
 # tc_b_bls = 2530.2807708159753
 period_b_bls = planet_b_period.value
@@ -264,20 +264,20 @@ for j in range(len(tc)):
     errors_p.append(intersections_p)
 
   
-    plt.plot(tc1[chi_mask], chi_sq[chi_mask],label='chisq')
-    plt.plot(tc1[chi_mask], p_1[chi_mask],label='chisq parabola', color='orange')
-    plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
-    plt.axvline(x=min_chi_time, linestyle='--', label='Chisq min')
-    plt.axvline(x=tc1[np.argmin(p_1)], color='orange', linestyle='--', label='Chisq min parabola')
+    # plt.plot(tc1[chi_mask], chi_sq[chi_mask],label='chisq')
+    # plt.plot(tc1[chi_mask], p_1[chi_mask],label='chisq parabola', color='orange')
+    # plt.axvline(x=tc_guess[j], color='r', linestyle='--', label='Bls Guess')
+    # plt.axvline(x=min_chi_time, linestyle='--', label='Chisq min')
+    # plt.axvline(x=tc1[np.argmin(p_1)], color='orange', linestyle='--', label='Chisq min parabola')
 
-    # for inter in intersections:
-    #     plt.axvline(x=inter, color='blue', linestyle='--')
-    plt.axhline(y=err_threshold, color='green', linestyle='--', label='Error Threshold')
-    plt.title(f'Transit {j+1}: Planet b')
-    plt.xlabel('tc')
-    plt.ylabel('X^2')
-    plt.legend()
-    plt.show()
+    # # for inter in intersections:
+    # #     plt.axvline(x=inter, color='blue', linestyle='--')
+    # plt.axhline(y=err_threshold, color='green', linestyle='--', label='Error Threshold')
+    # plt.title(f'Transit {j+1}: Planet b')
+    # plt.xlabel('tc')
+    # plt.ylabel('X^2')
+    # plt.legend()
+    # plt.show()
 
 
 #avg the errors   sig^2 = 0.5(sig1^2 + sig2^2)

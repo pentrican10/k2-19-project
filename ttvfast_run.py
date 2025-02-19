@@ -119,7 +119,9 @@ planet2 = models.Planet(
 
 planets = [planet1, planet2]
 ### first transit time from paper (used TC given in paper)
-Time = 2020 #value of start time from paper                # days
+# Time = 2020 #value of start time from paper                # days
+start_time = 1980
+Time = start_time
 dt = 0.1                                      # days
 Total = 5500                       # days
 N_step = int((Total-Time) / dt)
@@ -142,57 +144,62 @@ time_end = np.where(times_ == -2.)[0][0]
 planet_ind = planet_ind[:time_end]
 epoch_int = epoch_int[:time_end]
 times_= times_[:time_end]
-rsky_values = rsky_values[:time_end]
-vsky_values = vsky_values[:time_end]
+# rsky_values = rsky_values[:time_end]
+# vsky_values = vsky_values[:time_end]
 
 ### separate by planet 
-t_1 = times_[planet_ind==0]
-t_2 = times_[planet_ind==1]
+times_1 = times_[planet_ind==0]
+times_2 = times_[planet_ind==1]
 epoch_1 = epoch_int[planet_ind==0]
 epoch_2 = epoch_int[planet_ind==1]
-rsky_values_1 = rsky_values[planet_ind==0]
-rsky_values_2 = rsky_values[planet_ind==1]
-vsky_values_1 = vsky_values[planet_ind==0]
-vsky_values_2 = vsky_values[planet_ind==1]
+# rsky_values_1 = rsky_values[planet_ind==0]
+# rsky_values_2 = rsky_values[planet_ind==1]
+# vsky_values_1 = vsky_values[planet_ind==0]
+# vsky_values_2 = vsky_values[planet_ind==1]
 
 ### re-indexing about center data point
-half_t1 = int(((len(t_1))/2))
-half_t2 = int(((len(t_2))/2))
+half_t1 = int(((len(times_1))/2))
+half_t2 = int(((len(times_2))/2))
 epoch_1_ind = epoch_1 - half_t1
 epoch_2_ind = epoch_2 - half_t2
 
-
-
 ### linear regression planet1
 X1 = epoch_1_ind
-y1 = t_1
-
+y1 = times_1
 
 # Fit the model using numpy.polyfit
 slope_1, intercept_1 = np.polyfit(X1, y1, 1)
+# print(f'slope 1: {slope_1}')
+# print(f'intercept 1: {intercept_1}')
 
 # Predict the y values
 y_pred1 = slope_1 * X1 + intercept_1
 
 # Calculate residuals
-residuals1 = y1 - y_pred1
+omc_1 = y1 - y_pred1
+# calc_times_1 = period_b_petigura*epoch_1_ind + tc_b_petigura
+# omc_1 = times_1 - calc_times_1
 
 ### linear regression planet2
 X2 = epoch_2_ind
-y2 = t_2
+y2 = times_2
 
 # Fit the model using numpy.polyfit
 slope_2, intercept_2 = np.polyfit(X2, y2, 1)
+# print(f'slope 2: {slope_2}')
+# print(f'intercept 2: {intercept_2}')
 
 # Predict y values (expected times)
 y_pred2 = slope_2 * X2 + intercept_2
 
 # Calculate residuals (omc)
-residuals2 = y2 - y_pred2
+omc_2 = y2 - y_pred2
+# calc_times_2 = period_b_petigura*epoch_2_ind + tc_b_petigura
+# omc_2 = times_2 - calc_times_2
 
 ### plot 
-# plt.scatter(t_1,residuals1,color='orange',label='planet b lin')
-# plt.scatter(t_2,residuals2,color='blue', label='planet c lin')
+# plt.scatter(times_1,omc_1,color='orange',label='planet b lin')
+# plt.scatter(times_2,omc_2,color='blue', label='planet c lin')
 # plt.title("Linear Regression TTVs - K2-19")
 # plt.ylabel('TTV (days)')
 # plt.xlabel('Time (days)')
@@ -202,26 +209,27 @@ residuals2 = y2 - y_pred2
 
 
 
-### using ephem to calculate
-period_sim1 = planet1.period
-period_sim2 = planet2.period
-expected_time_1 = np.zeros(len(t_1))
-expected_time_2 = np.zeros(len(t_2))
-# re-index and find intercept 
-for i in range(len(epoch_1_ind)):
-    expected_time1 =  period_sim1 * epoch_1_ind[i]
-    expected_time_1[i] = expected_time1
-for i in range(len(epoch_2_ind)):
-    expected_time2 =   period_sim2 * epoch_2_ind[i]
-    expected_time_2[i] = expected_time2
+# ### using ephem to calculate
+# period_sim1 = planet1.period
+# period_sim2 = planet2.period
+# expected_time_1 = np.zeros(len(times_1))
+# expected_time_2 = np.zeros(len(times_2))
+# # re-index and find intercept 
+# for i in range(len(epoch_1_ind)):
+#     expected_time1 =  period_sim1 * epoch_1_ind[i]
+#     expected_time_1[i] = expected_time1
+# for i in range(len(epoch_2_ind)):
+#     expected_time2 =   period_sim2 * epoch_2_ind[i]
+#     expected_time_2[i] = expected_time2
 
-omc1 = t_1 - expected_time_1
-omc2 = t_2 - expected_time_2
+# omc_1 = times_1 - expected_time_1
+# omc_2 = times_2 - expected_time_2
 
 
+'''
 def ttvfast_omc(planets):
     ### first transit time from paper (used TC given in paper)
-    Time = 2027.9023                  # days
+    Time = 2218                 # days
     dt = 0.1                                      # days
     Total = 5500                       # days
     N_step = int((Total-Time) / dt)
@@ -249,8 +257,8 @@ def ttvfast_omc(planets):
     vsky_values = vsky_values[:time_end]
 
     ### separate by planet 
-    t_1 = times_[planet_ind==0]
-    t_2 = times_[planet_ind==1]
+    times_1 = times_[planet_ind==0]
+    times_2 = times_[planet_ind==1]
     epoch_1 = epoch_int[planet_ind==0]
     epoch_2 = epoch_int[planet_ind==1]
     rsky_values_1 = rsky_values[planet_ind==0]
@@ -259,8 +267,8 @@ def ttvfast_omc(planets):
     vsky_values_2 = vsky_values[planet_ind==1]
 
     ### re-indexing about center data point
-    half_t1 = int(((len(t_1))/2))
-    half_t2 = int(((len(t_2))/2))
+    half_t1 = int(((len(times_1))/2))
+    half_t2 = int(((len(times_2))/2))
     epoch_1_ind = epoch_1 - half_t1
     epoch_2_ind = epoch_2 - half_t2
 
@@ -268,7 +276,7 @@ def ttvfast_omc(planets):
 
     ### linear regression planet1
     X1 = epoch_1_ind
-    y1 = t_1
+    y1 = times_1
 
 
     # Fit the model using numpy.polyfit
@@ -278,11 +286,11 @@ def ttvfast_omc(planets):
     y_pred1 = slope_1 * X1 + intercept_1
 
     # Calculate residuals
-    residuals1 = y1 - y_pred1
+    omc_1 = y1 - y_pred1
 
     ### linear regression planet2
     X2 = epoch_2_ind
-    y2 = t_2
+    y2 = times_2
 
     # Fit the model using numpy.polyfit
     slope_2, intercept_2 = np.polyfit(X2, y2, 1)
@@ -291,6 +299,7 @@ def ttvfast_omc(planets):
     y_pred2 = slope_2 * X2 + intercept_2
 
     # Calculate residuals (omc)
-    residuals2 = y2 - y_pred2
+    omc_2 = y2 - y_pred2
 
-    return t_1, residuals1, t_2, residuals2
+    return times_1, omc_1, times_2, omc_2
+'''

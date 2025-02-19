@@ -402,7 +402,7 @@ plt.show()
 #####################################################################################################################################
 
 ### plot fit with ttvfast
-from ttvfast_test import t_1, residuals1, t_2, residuals2
+from ttvfast_run import t_1, residuals1, t_2, residuals2
 plt.scatter(t_1,residuals1,color='orange',s=4,label='planet b ttvfast')
 plt.scatter(t_2,residuals2,color='blue',s=4, label='planet c ttvfast')
 plt.errorbar(tc_chi_parabola, ttv_chi_fit_omc, xerr=err_tc_chi_p, yerr=err_tc_chi_p, fmt='ro', capsize=5, label='TESS times b')

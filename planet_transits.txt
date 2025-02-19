@@ -1,4 +1,4 @@
-Planet Transit Instrument Tc(days) σ(Tc)(days) Notes
+Planet Transit Instrument Tc(days) Tc_err(days) Notes
 K2-19b 30 FLWO 2218.0041 0.0022 Narita2015
 K2-19b 34 TRAPPIST 2249.6955 0.0014 Narita2015
 K2-19b 41 MuSCAT 2305.1505 0.0014 Narita2015

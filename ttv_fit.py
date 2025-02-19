@@ -1,4 +1,4 @@
-from ttvfast_test import t_1, residuals1, t_2, residuals2
+from ttvfast_run import t_1, residuals1, t_2, residuals2
 
 import matplotlib.pyplot as plt
 
