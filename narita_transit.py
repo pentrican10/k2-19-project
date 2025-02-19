@@ -216,12 +216,24 @@ plt.show()
 output_file = "ttv_results.txt"
 
 # Combine all data into a structured format
-data_to_save = np.column_stack((all_transit_num, all_obs_tc, all_obs_tc_err, all_omc))
+source = ['Narita2015', 'Narita2015', 'Narita2015', 'Narita2015', 'Narita2015', 'Narita2015', 'Narita2015', 'Narita2015', 'Narita2015', 'Narita2015', 
+          'Petigura2020', 'Petigura2020', 'Petigura2020', 'Petigura2020', 'Petigura2020', 'Petigura2020', 
+          'TESS', 'TESS', 'TESS', 'TESS', 'TESS', 'TESS', 'TESS', 'TESS']
+
+instrument = ['K2', 'K2', 'K2', 'K2', 'K2', 'K2', 'K2', 'K2', 'K2', 'K2', 
+          'FLWO', 'TRAPPIST', 'MuSCAT', 'Spitzer', 'LCO', 'Spitzer', 
+          'TESS', 'TESS', 'TESS', 'TESS', 'TESS', 'TESS', 'TESS', 'TESS']
+
+# Ensure source and instrument are numpy arrays with dtype=object
+source = np.array(source, dtype=object)
+instrument = np.array(instrument, dtype=object)
+
+data_to_save = np.column_stack((all_transit_num, all_obs_tc, all_obs_tc_err, all_omc, source,instrument))
 
 # Define header
-header = "Index Tc Tc_err OMC"
+header = "Index Tc Tc_err OMC Source Instrument"
 
 # Save to file
-np.savetxt(output_file, data_to_save, fmt='%d %.8f %.8f %.8f', header=header, comments='')
+np.savetxt(output_file, data_to_save, fmt='%d %.8f %.8f %.8f %s %s', header=header, comments='')
 
 print(f"Results saved to {output_file}")
