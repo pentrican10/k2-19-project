@@ -10,13 +10,17 @@ from scipy.optimize import minimize
 from scipy.optimize import root_scalar
 from scipy.optimize import least_squares
 from scipy.optimize import curve_fit
+import matplotlib
+matplotlib.use("TkAgg")  # Use an interactive backend
 #import ttvfast_test
 
 
 ### switch to mask out transits
 mask_transits = True
 
-data_dir = "C:\\Users\\Paige\\Projects\\data\\k2-19_data"
+# data_dir = "C:\\Users\\Paige\\Projects\\data\\k2-19_data"
+data_dir = "/mnt/c/Users/Paige/Projects/data/k2-19_data"
+
 
 
 file = "ajab5220t1_mrt.txt"

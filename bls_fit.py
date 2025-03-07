@@ -6,8 +6,12 @@ import pandas as pd
 import os
 import batman
 from scipy.stats import norm
+import matplotlib
+matplotlib.use("TkAgg")  # Use an interactive backend
 
-data_dir = "C:\\Users\\Paige\\Projects\\data\\k2-19_data"
+# data_dir = "C:\\Users\\Paige\\Projects\\data\\k2-19_data"
+data_dir = "/mnt/c/Users/Paige/Projects/data/k2-19_data"
+
 
 ### path to table - Petigura et al 2020
 file_path = os.path.join(data_dir, "ajab5220t1_mrt.txt")
