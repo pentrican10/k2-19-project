@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use("TkAgg")  # Use an interactive backend
+# matplotlib.use("TkAgg")  # Use an interactive backend
 import matplotlib.pyplot as plt
 import numpy as np
 import jax.numpy as jnp
@@ -12,7 +12,7 @@ import numpyro, jax
 import numpyro.distributions as dist
 from numpyro.infer import MCMC, NUTS, init_to_value
 config.update('jax_enable_x64', True)
-numpyro.set_platform('cpu')
+numpyro.set_platform('cpu') 
 num_chains = 4
 numpyro.set_host_device_count(num_chains)
 print ('# jax device count:', jax.local_device_count())
@@ -20,12 +20,12 @@ print ('# jax device count:', jax.local_device_count())
 from jnkepler.jaxttv import JaxTTV
 from jnkepler.jaxttv import ttv_default_parameter_bounds, ttv_optim_curve_fit, scale_pdic
 import corner
-
-
+# adding comment for testing 
+### test comment 
 
 
 # test data
-d = pd.read_csv("ttv_results.txt", sep="\s+", header=None, names=['Planet_num', 'Index', 'Tc', 'Tc_err', 'OMC', 'Source', 'Instrument'])
+d = pd.read_csv("ttv_results.txt", sep="\s+", header=0, names=['Planet_num', 'Index', 'Tc', 'Tc_err', 'OMC', 'Source', 'Instrument'])
 ### use only narita and first 3 petigura points 
 # d = pd.read_csv("intermediate.txt", sep="\s+", header=None, names=['Planet_num', 'Index', 'Tc', 'Tc_err', 'OMC', 'Source', 'Instrument'])
 
@@ -39,9 +39,14 @@ for j in range(2):
     list_of_obs_transit_times.append(np.array(d.Tc[d.Planet_num==j+1]))
     list_of_transit_time_errs.append(np.array(d.Tc_err[d.Planet_num==j+1]))
 
-tcobs = [jnp.array(d.Tc[d.Planet_num==j+1]) for j in range(2)]
-errorobs = [jnp.array(d.Tc_err[d.Planet_num==j+1]) for j in range(2)] 
-errorobs[1] = errorobs[1] 
+tcobs = []
+errorobs = []
+for j in range(2):
+    tcobs.append(np.array(d.Tc[d.Planet_num == j + 1]))
+    errorobs.append(np.array(d.Tc_err[d.Planet_num == j + 1]))
+print(tcobs)
+
+
 
 t_start = 1980.  # start of integration
 t_end = 5500. # end of integration
@@ -82,20 +87,6 @@ par_dict = {
     "smass": .88 # stellar mass
 }
 
-# transit_times, fractional_energy_error = jttv.get_transit_times_obs(par_dict)
-# print("# observed")
-# print(jttv.tcobs_flatten)
-# print()
-# print("# model")
-# print(transit_times) 
-
-# ### encouraged to check timing precision
-# _, _ = jttv.check_timing_precision(par_dict)
-
-# ### list of all transit times between t_start and t_end
-# tc_all_list = jttv.get_transit_times_all_list(par_dict)
-# jttv.plot_model(tc_all_list, t0_lin=[2027.9023, 2020.0007], p_lin=[7.92087, 11.8980])
-# plt.show()
 
 param_bounds = ttv_default_parameter_bounds(jttv, emax=0.25)
 
@@ -122,7 +113,7 @@ tc, _ = jttv.check_timing_precision(popt)
 pdic_normal, pdic_student = jttv.check_residuals(popt)
 plt.show()
 
-
+'''
 ### setup & run HMC
 def model_scaled(sample_keys, param_bounds):
     """numpyro model for scaled parameters"""
@@ -199,4 +190,5 @@ plt.show()
 # ### list of all transit times between t_start and t_end
 # tc_all_list = jttv.get_transit_times_all_list(popt)
 # jttv.plot_model(tc_all_list)
-# plt.show()
+# plt.show()'
+'''
