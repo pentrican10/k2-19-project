@@ -11,7 +11,7 @@ from scipy.optimize import root_scalar
 from scipy.optimize import least_squares
 from scipy.optimize import curve_fit
 import matplotlib
-matplotlib.use("TkAgg")  # Use an interactive backend
+# matplotlib.use("TkAgg")  # Use an interactive backend
 #import ttvfast_test
 
 
