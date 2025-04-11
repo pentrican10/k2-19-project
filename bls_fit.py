@@ -7,10 +7,11 @@ import os
 import batman
 from scipy.stats import norm
 import matplotlib
-matplotlib.use("TkAgg")  # Use an interactive backend
+# matplotlib.use("TkAgg")  # Use an interactive backend
 
 # data_dir = "C:\\Users\\Paige\\Projects\\data\\k2-19_data"
-data_dir = "/mnt/c/Users/Paige/Projects/data/k2-19_data"
+# data_dir = "/mnt/c/Users/Paige/Projects/data/k2-19_data"
+data_dir = "/Users/pentrican10/Projects/Data/k2-19-data"
 
 
 ### path to table - Petigura et al 2020

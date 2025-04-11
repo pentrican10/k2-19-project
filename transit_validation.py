@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import numpy as np
 import batman
 from bls_fit import time, flux, flux_err
@@ -39,7 +40,7 @@ num_transits = len(transit_times)
 cols = 3  # Number of columns in subplot grid
 rows = (num_transits + 1) // cols  # Determine number of rows dynamically
 
-fig, axes = plt.subplots(rows, cols, figsize=(12, 6), sharey=True)
+fig, axes = plt.subplots(rows, cols, figsize=(14, 8), sharey=True)
 axes = axes.flatten()  # Flatten in case of 2D array
 
 ### Loop through each transit time and plot in corresponding subplot
@@ -73,6 +74,10 @@ for i, t0 in enumerate(transit_times):
     ax.set_xlim(t_min, t_max)
     ax.set_ylabel('Flux')
     ax.set_title(f'Tc {round(t0,4)}')
+    ### set number of ticks and force to be in full format (not trunkated)
+    ticks = np.round(np.linspace(t_min, t_max, 5), 2)
+    ax.set_xticks(ticks)
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x:.3f}"))
     #ax.legend(loc='lower left')
     ax.grid(True)
 
@@ -85,72 +90,3 @@ plt.tight_layout()
 plt.show()
 
 
-
-
-
-'''
-import matplotlib.pyplot as plt
-import numpy as np
-import batman
-from bls_fit import time, flux, flux_err
-time = time.value
-flux=flux.value
-flux_err = flux_err.value
-
-### change time convention
-petigura_offset = 2454833 # BJD - 2454833
-tess_offset = 2457000 # BTJD - Barycentric TESS Julian Date (Julian Date - 2457000)
-def convert_time_t2p(times):
-    ### TESS offset 
-    BTJD = times + tess_offset
-    new_time = BTJD - petigura_offset
-    return new_time
-
-time = convert_time_t2p(time)
-
-### params from exoplanet archive
-per_b = 7.9222
-rp_b = 0.0777
-T14_b = 3.237 * 0.0416667  # convert to days
-b_b = 0.17
-q1_b = 0.4
-q2_b = 0.3
-
-### Define a buffer around each transit time (e.g., 1.5 * transit duration)
-buffer = 1.5 * T14_b
-
-### Generate a list of transit times based on the detected period
-transit_times = [4697.289029080774, 4713.127343841249, 4721.041829879279, 4728.959652590447, 4736.880811974289, 4744.798634685457, 5433.878773628148, 5449.720258227197]
-
-### Loop through each transit time and plot the light curve segment
-for i, t0 in enumerate(transit_times):
-    t_min = t0 - buffer
-    t_max = t0 + buffer
-
-    ### Select only the data within this transit window
-    mask = (time >= t_min) & (time <= t_max)
-
-    ### generate model
-    theta_initial = [t0, per_b, rp_b, b_b, T14_b, q1_b, q2_b]
-    ### initialize params
-    params = batman.TransitParams()
-    params.t0, params.per, params.rp,params.b, params.T14, q1, q2 = theta_initial
-    params.u = [2*np.sqrt(q1)*q2, np.sqrt(q1)*(1-2*q2)]  # Limb darkening coefficients
-    params.limb_dark = 'quadratic'
-        
-    transit_model = batman.TransitModel(params, time[mask])
-            
-    ### Generate model light curve
-    model_flux = transit_model.light_curve(params)
-
-    plt.figure(figsize=(8,5))
-    plt.scatter(time[mask], flux[mask], label=f'TESS Data')
-    plt.plot(time[mask], model_flux, color="red", label="Transit Model")
-    plt.axvline(x=t0, color='green', linestyle='--', label=f'Tc {round(t0,4)}')
-    plt.xlabel(f'Time (BJD - {petigura_offset})')
-    plt.ylabel('Flux')
-    plt.title(f'TESS Light Curve, Tc {round(t0,4)}')
-    plt.legend(loc='lower left')
-    plt.grid(True)
-    plt.show()
-'''
