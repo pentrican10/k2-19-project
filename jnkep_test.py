@@ -111,7 +111,7 @@ tc, _ = jttv.check_timing_precision(popt)
 pdic_normal, pdic_student = jttv.check_residuals(popt)
 plt.show()
 
-'''
+
 ### setup & run HMC
 def model_scaled(sample_keys, param_bounds):
     """numpyro model for scaled parameters"""
@@ -145,7 +145,7 @@ kernel = NUTS(model_scaled,
             dense_mass=True,
             #regularize_mass_matrix=False # this speeds up sampling for unknown reason
             )
-mcmc = MCMC(kernel, num_warmup=500, num_samples=1500, num_chains=num_chains)
+mcmc = MCMC(kernel, num_warmup=50, num_samples=150, num_chains=num_chains)
 
 # 4hr30min on M1 mac studio
 rng_key = random.PRNGKey(0)
@@ -189,4 +189,3 @@ plt.show()
 # tc_all_list = jttv.get_transit_times_all_list(popt)
 # jttv.plot_model(tc_all_list)
 # plt.show()'
-'''
