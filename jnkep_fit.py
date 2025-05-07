@@ -71,3 +71,68 @@ tc, _ = jttv.check_timing_precision(popt)
 pdic_normal, pdic_student = jttv.check_residuals(popt)
 plt.show()
 
+### set up and run HMC
+def model_scaled(sample_keys, param_bounds):
+    """numpyro model for scaled parameters"""
+    par = {}
+
+    # sample parameters from priors
+    for key in sample_keys:
+        par[key+"_scaled"] = numpyro.sample(key+"_scaled", dist.Uniform(param_bounds[key][0]*0, param_bounds[key][0]*0+1.))
+        par[key] = numpyro.deterministic(key, par[key+"_scaled"] * (param_bounds[key][1] - param_bounds[key][0]) + param_bounds[key][0])
+    if "pmass" not in sample_keys:
+        par["pmass"] = numpyro.deterministic("pmass", jnp.exp(par["lnpmass"]))
+    
+    # Jacobian for uniform ecc prior
+    ecc = numpyro.deterministic("ecc", jnp.sqrt(par['ecosw']**2+par['esinw']**2))
+    numpyro.factor("eprior", -jnp.log(ecc))
+
+    # compute transit times
+    tcmodel, ediff = jttv.get_transit_times_obs(par)
+    numpyro.deterministic("ediff", ediff)
+    numpyro.deterministic("tcmodel", tcmodel)
+    
+    # likelihood
+    tcerrmodel = jttv.errorobs_flatten     
+    numpyro.sample("obs", dist.Normal(loc=tcmodel, scale=tcerrmodel), obs=jttv.tcobs_flatten)
+
+# physical parameters to sample from
+sample_keys = ["ecosw", "esinw", "pmass", "period", "tic"] # uniform mass prior
+
+# scaled parameters
+pdic_scaled = scale_pdic(popt, param_bounds)
+
+kernel = NUTS(model_scaled, 
+            init_strategy=init_to_value(values=pdic_scaled), 
+            dense_mass=True,
+            #regularize_mass_matrix=False # this speeds up sampling for unknown reason
+            )
+
+mcmc = MCMC(kernel, num_warmup=50, num_samples=150, num_chains=num_chains)
+
+# 4hr30min on M1 mac studio
+rng_key = random.PRNGKey(0)
+mcmc.run(rng_key, sample_keys, param_bounds, extra_fields=('potential_energy', 'num_steps', 'adapt_state'))
+
+mcmc.print_summary()
+
+# save results
+import dill
+with open("jnkep_fit.pkl", "wb") as f:
+    dill.dump(mcmc, f)
+
+### plot models drawn from posteriors 
+samples = mcmc.get_samples()
+
+means, stds = jttv.sample_means_and_stds(samples)
+
+jttv.plot_model(means, tcmodelunclist=stds)
+
+import arviz as az
+idata = az.from_numpyro(mcmc)
+fig = az.plot_trace(mcmc, var_names=sample_keys, compact=False)
+plt.tight_layout(pad=0.2)
+
+idata.posterior['mu'] = idata.posterior['pmass'] / 3.003e-6
+names = ["period", "tic", "ecosw", "esinw", "mu"]
+fig = corner.corner(idata, var_names=names, show_titles=True)
