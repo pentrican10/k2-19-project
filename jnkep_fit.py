@@ -108,7 +108,7 @@ kernel = NUTS(model_scaled,
             #regularize_mass_matrix=False # this speeds up sampling for unknown reason
             )
 
-mcmc = MCMC(kernel, num_warmup=50, num_samples=150, num_chains=num_chains)
+mcmc = MCMC(kernel, num_warmup=500, num_samples=1500, num_chains=num_chains)
 
 # 4hr30min on M1 mac studio
 rng_key = random.PRNGKey(0)
