@@ -1,0 +1,30 @@
+Title: K2-19b and c are in a 3:2 Commensurability but out of Resonance: 
+       A Challenge to Planet Assembly by Convergent Migration 
+Authors: Petigura E.A., Livingston J., Batygin K., Mills S.M., Werner M., 
+         Isaacson H., Fulton B.J., Howard A.W., Weiss L.M., 
+         Espinoza N., Jontof-Hutter D., Shporer A., Bayliss D., Barros S.C.C. 
+Table: Transit Times
+================================================================================
+Byte-by-byte Description of file: ajab5220t1_mrt.txt
+--------------------------------------------------------------------------------
+   Bytes Format Units   Label    Explanations
+--------------------------------------------------------------------------------
+   1-  6 A6     ---     Planet   Planet
+   8- 10 I3     ---     Transit  Kepler Transit number
+  12- 19 A8     ---     Inst     Instrument
+  21- 29 F9.4   d       Tc       Transit time, BJD_TBD - 2454833
+  31- 36 F6.4   d     e_Tc       Uncertainty in Tc
+  38- 38 A1     ---     Source   Source (1)
+--------------------------------------------------------------------------------
+Note (1): Source of transit times --
+  A = This work;
+  B =  Narita et al. (2015ApJ...815...47N).
+--------------------------------------------------------------------------------
+K2-19b  30 FLWO     2218.0041 0.0022 B 
+K2-19b  34 TRAPPIST 2249.6955 0.0014 B 
+K2-19b  41 MuSCAT   2305.1505 0.0014 B 
+K2-19b 133 Spitzer  3033.8604 0.0009 A 
+K2-19c  87 Spitzer  3019.4774 0.0074 A 
+K2-19b 141 LCO      3097.2502 0.0024 A 
+K2-19b 150 Spitzer  3168.5368 0.0014 A 
+K2-19c 102 Spitzer  3197.8645 0.0059 A 

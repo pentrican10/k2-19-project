@@ -1,0 +1,13 @@
+# ignore virtual environment
+k2_env/
+
+# Ignore python bytecode files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore other common IDE/Project files 
+.idea/
+.vscode/
+*.swp
+
