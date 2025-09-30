@@ -2,16 +2,13 @@
 # coding: utf-8
 
 # # Jnkepler OMC Fitting
-
-# In[1]:
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
 from scipy.stats import norm
 import matplotlib
+import pickle
 
 import jax.numpy as jnp
 from jax import config, random
@@ -29,14 +26,8 @@ from jnkepler.jaxttv import ttv_default_parameter_bounds, ttv_optim_curve_fit, s
 import corner
 
 
-# In[2]:
-
-
 ### Read results
-d = pd.read_csv("ttv_results.txt", sep="\s+", header=0, names=['Planet_num', 'Index', 'Tc', 'Tc_err', 'Source', 'Instrument'])
-
-
-# In[3]:
+d = pd.read_csv("data/ttv_results.txt", sep="\s+", header=0, names=['Planet_num', 'Index', 'Tc', 'Tc_err', 'Source', 'Instrument'])
 
 
 ### get times, errs from the data
@@ -57,9 +48,6 @@ for j in range(2):
     errorobs.append(np.array(d.Tc_err[d.Planet_num == j + 1]))
 
 
-# In[4]:
-
-
 ### run JaxTTV sim
 t_start = 1980.  # start of ~integration
 t_end = 5500. # end of integration
@@ -69,15 +57,16 @@ dt = 0.25 # integration timestep
 jttv = JaxTTV(t_start, t_end, dt, tcobs, period_guess, errorobs=errorobs, print_info=True)
 
 
-# In[5]:
-
-
 ### set bounds for fit
 param_bounds = ttv_default_parameter_bounds(jttv, emax=0.25)
 
 ### initialize p_init: p1,p2,ecosw1,ecosw2,esinw1,esinw2,tic1,tic2,lnpmass1,lnpmass2
 ### using best fit for run with all points
-p_init = np.array([7.91978264, 11.90381532, -0.12693783, -0.08689699, -0.14793586, -0.17598388, 1980.38363425, 1984.27272612, -9.07538167, -10.13796006])
+p_init = np.array([7.91978264, 11.90381532, 
+                   -0.12693783, -0.08689699, 
+                   -0.14793586, -0.17598388, 
+                   1980.38363425, 1984.27272612, 
+                   -9.07538167, -10.13796006])
 
 ### fit
 popt = ttv_optim_curve_fit(jttv,param_bounds,p_init=p_init, plot=False)
@@ -85,16 +74,10 @@ popt = ttv_optim_curve_fit(jttv,param_bounds,p_init=p_init, plot=False)
 print(popt)
 
 
-# In[6]:
-
-
 ### plot fit
 tcall = jttv.get_transit_times_all_list(popt,truncate=False)
 jttv.plot_model(tcall, marker='.')
 plt.show()
-
-
-# In[7]:
 
 
 ### check precision and residuals 
@@ -105,10 +88,6 @@ plt.show()
 
 
 # ### Save results
-
-# In[8]:
-
-
 ### save data
 ### jnkep model times
 t_jnkep_b = tcall[0]
@@ -125,7 +104,6 @@ best_fit_tc_b = popt['tic'][0]
 best_fit_tc_c = popt['tic'][1]
 
 
-# In[9]:
 
 
 import json
@@ -156,18 +134,14 @@ fit_data = {
     }
 }
 
-# Save to JSON
-with open("jnkep_fit_data.json", "w") as f:
-    json.dump(fit_data, f, indent=4)
+with open('data/jnkep_initial_fit_data_tree-11_accept-90_hessian_emax-0.5.pkl', 'wb') as f:
+    pickle.dump({'jttv': jttv, 'popt': popt, 'param_bounds': param_bounds}, f)
 
-print("Data saved successfully.")
+print('Initial fit data saved successfully')
+
 
 
 # # Set up and run HMC
-
-# In[10]:
-
-
 ### hessian inverse initialization from Kento's code 
 def model_scaled(sample_keys, param_bounds):
     """numpyro model for scaled parameters"""
@@ -194,14 +168,10 @@ def model_scaled(sample_keys, param_bounds):
     numpyro.sample("obs", dist.Normal(loc=tcmodel, scale=tcerrmodel), obs=jttv.tcobs_flatten)
 
 
-# In[11]:
-
 
 # physical parameters to sample from
 sample_keys = ["ecosw", "esinw", "pmass", "period", "tic"] # uniform mass prior
 
-
-# In[12]:
 
 
 # scaled parameters
@@ -226,7 +196,6 @@ dense_mass = [tuple([key+"_scaled" for key in sample_keys])]
 inverse_mass_matrix = {dense_mass[0]: parameter_cov_scaled}
 
 
-# In[13]:
 
 
 kernel = NUTS(model_scaled, 
@@ -239,74 +208,23 @@ kernel = NUTS(model_scaled,
             )
 
 
-# In[14]:
-# To do, check point code
-
 mcmc = MCMC(kernel, num_warmup=1000, num_samples=1000, num_chains=num_chains)
 
 
-# In[15]:
 
 rng_key = random.PRNGKey(0)
 mcmc.run(rng_key, sample_keys, param_bounds, extra_fields=('potential_energy', 'num_steps', 'adapt_state'))
 
 
-# In[ ]:
 
 
 mcmc.print_summary()
 
 
-# In[ ]:
 
 
 # save results
 import dill
-with open("jnkep_fit_k2-19_nburn-1000_nsteps-1000_accept-90_tree-11_hessian.pkl", "wb") as f:
+with open("data/jnkep_fit_k2-19_nburn-1000_nsteps-1000_accept-90_tree-11_hessian_emax-0.5.pkl", "wb") as f:
     dill.dump(mcmc, f)
-
-
-# # Plot models drawn from posteriors
-
-# In[ ]:
-
-
-samples = mcmc.get_samples()
-
-
-# In[ ]:
-
-
-means, stds = jttv.sample_means_and_stds(samples)
-
-
-# In[ ]:
-
-
-jttv.plot_model(means, tcmodelunclist=stds)
-
-
-# # Trace and corner plots
-
-# In[ ]:
-
-
-import arviz as az
-idata = az.from_numpyro(mcmc)
-fig = az.plot_trace(mcmc, var_names=sample_keys, compact=False)
-plt.tight_layout(pad=0.2)
-
-
-# In[ ]:
-
-
-idata.posterior['mu'] = idata.posterior['pmass'] / 3.003e-6
-names = ["period", "tic", "ecosw", "esinw", "mu"]
-fig = corner.corner(idata, var_names=names, show_titles=True)
-
-
-# In[ ]:
-
-
-
 

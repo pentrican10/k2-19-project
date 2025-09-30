@@ -33,7 +33,7 @@ import corner
 
 
 ### Read results
-d = pd.read_csv("ttv_results.txt", sep="\s+", header=0, names=['Planet_num', 'Index', 'Tc', 'Tc_err', 'Source', 'Instrument'])
+d = pd.read_csv("data/ttv_results.txt", sep="\s+", header=0, names=['Planet_num', 'Index', 'Tc', 'Tc_err', 'Source', 'Instrument'])
 
 
 # In[3]:
@@ -157,7 +157,7 @@ fit_data = {
 }
 
 # Save to JSON
-with open("jnkep_fit_data.json", "w") as f:
+with open("data/jnkep_fit_data.json", "w") as f:
     json.dump(fit_data, f, indent=4)
 
 print("Data saved successfully.")
@@ -168,7 +168,7 @@ print("Data saved successfully.")
 # In[10]:
 
 
-
+### hessian inverse initialization from Kento's code 
 def model_scaled(sample_keys, param_bounds):
     """numpyro model for scaled parameters"""
     par = {}
@@ -179,7 +179,7 @@ def model_scaled(sample_keys, param_bounds):
         par[key] = numpyro.deterministic(key, par[key+"_scaled"] * (param_bounds[key][1] - param_bounds[key][0]) + param_bounds[key][0])
     if "pmass" not in sample_keys:
         par["pmass"] = numpyro.deterministic("pmass", jnp.exp(par["lnpmass"]))
-
+    
     # Jacobian for uniform ecc prior
     ecc = numpyro.deterministic("ecc", jnp.sqrt(par['ecosw']**2+par['esinw']**2))
     numpyro.factor("eprior", -jnp.log(ecc))
@@ -188,7 +188,7 @@ def model_scaled(sample_keys, param_bounds):
     tcmodel, ediff = jttv.get_transit_times_obs(par)
     numpyro.deterministic("ediff", ediff)
     numpyro.deterministic("tcmodel", tcmodel)
-
+    
     # likelihood
     tcerrmodel = jttv.errorobs_flatten     
     numpyro.sample("obs", dist.Normal(loc=tcmodel, scale=tcerrmodel), obs=jttv.tcobs_flatten)
@@ -208,14 +208,34 @@ sample_keys = ["ecosw", "esinw", "pmass", "period", "tic"] # uniform mass prior
 pdic_scaled = scale_pdic(popt, param_bounds)
 
 
+### initializing mass matrix
+# information matrix and parameter covariance
+from jnkepler.jaxttv.information import information
+fisher_information = information(jttv, popt, sample_keys)
+parameter_cov = jnp.linalg.inv(fisher_information)
+
+for i,key in enumerate(sample_keys):
+    print(key, np.diag(jnp.sqrt(parameter_cov))[3*i:3*i+3])
+
+# Fisher information and parameter covariance matrix for scaled parameters
+fisher_information_scaled = information(jttv, popt, sample_keys, param_bounds=param_bounds)
+parameter_cov_scaled = jnp.linalg.inv(fisher_information_scaled)
+
+# initialize inverse mass matrix using parameter covariance
+dense_mass = [tuple([key+"_scaled" for key in sample_keys])]
+inverse_mass_matrix = {dense_mass[0]: parameter_cov_scaled}
+
+
 # In[13]:
 
 
 kernel = NUTS(model_scaled, 
             init_strategy=init_to_value(values=pdic_scaled), 
-            dense_mass=True,
-            regularize_mass_matrix=False, # this speeds up sampling for unknown reason
-            target_accept_prob=0.9
+            dense_mass=dense_mass,
+            inverse_mass_matrix=inverse_mass_matrix,
+            target_accept_prob=0.9,
+            max_tree_depth=11
+            #regularize_mass_matrix=False # this speeds up sampling for unknown reason
             )
 
 
@@ -242,51 +262,7 @@ mcmc.print_summary()
 
 # save results
 import dill
-with open("jnkep_fit_k2-19_nburn-1000_nsteps-1000_accept-90.pkl", "wb") as f:
+with open("data/jnkep_fit_k2-19_nburn-1000_nsteps-1000_accept-90_tree-11_hessian.pkl", "wb") as f:
     dill.dump(mcmc, f)
-
-
-# # Plot models drawn from posteriors
-
-# In[ ]:
-
-
-samples = mcmc.get_samples()
-
-
-# In[ ]:
-
-
-means, stds = jttv.sample_means_and_stds(samples)
-
-
-# In[ ]:
-
-
-jttv.plot_model(means, tcmodelunclist=stds)
-
-
-# # Trace and corner plots
-
-# In[ ]:
-
-
-import arviz as az
-idata = az.from_numpyro(mcmc)
-fig = az.plot_trace(mcmc, var_names=sample_keys, compact=False)
-plt.tight_layout(pad=0.2)
-
-
-# In[ ]:
-
-
-idata.posterior['mu'] = idata.posterior['pmass'] / 3.003e-6
-names = ["period", "tic", "ecosw", "esinw", "mu"]
-fig = corner.corner(idata, var_names=names, show_titles=True)
-
-
-# In[ ]:
-
-
 
 
