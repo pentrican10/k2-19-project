@@ -1,34 +1,45 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# # Jnkepler OMC Fitting
+import jax, os
+jax_version = jax.__version__
+major, minor, patch = (int(x) for x in jax_version.split(".")[:3])
+if (major, minor, patch) >= (0, 4, 32):
+    print(f"JAX version: {jax_version}")
+    os.environ["XLA_FLAGS"] = "--xla_cpu_use_thunk_runtime=false"
 import numpy as np
+import pickle 
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
-from scipy.stats import norm
-import matplotlib
-import pickle
-
-import jax.numpy as jnp
 from jax import config, random
 import numpyro, jax
 import numpyro.distributions as dist
 from numpyro.infer import MCMC, NUTS, init_to_value
 config.update('jax_enable_x64', True)
-numpyro.set_platform('cpu') 
+numpyro.set_platform('cpu')
 num_chains = 4
 numpyro.set_host_device_count(num_chains)
 print ('# jax device count:', jax.local_device_count())
 
+
+from jnkepler.jaxttv.infer import *
+from jnkepler.nbodytransit import *
+import importlib_resources
+path = importlib_resources.files('jnkepler').joinpath('data')  # path for test data
 from jnkepler.jaxttv import JaxTTV
 from jnkepler.jaxttv import ttv_default_parameter_bounds, ttv_optim_curve_fit, scale_pdic
 import corner
 
+filter_times = True
 
 ### Read results
-d = pd.read_csv("data/ttv_results.txt", sep="\s+", header=0, names=['Planet_num', 'Index', 'Tc', 'Tc_err', 'Source', 'Instrument'])
+d = pd.read_csv("ttv_results.txt", sep="\s+", header=0, names=['Planet_num', 'Index', 'Tc', 'Tc_err', 'Source', 'Instrument'])
 
+if filter_times:
+    times_to_remove = [3097.250200, 2004.138510, 2027.901240]
+    
+    # Remove rows
+    d_filtered = d[~d['Tc'].isin(times_to_remove)]
+    
+    d = d_filtered
 
 ### get times, errs from the data
 list_of_obs_transit_times = []
@@ -77,7 +88,7 @@ print(popt)
 ### plot fit
 tcall = jttv.get_transit_times_all_list(popt,truncate=False)
 jttv.plot_model(tcall, marker='.')
-plt.show()
+# plt.show()
 
 
 ### check precision and residuals 
@@ -134,7 +145,7 @@ fit_data = {
     }
 }
 
-with open('data/jnkep_initial_fit_data_tree-11_accept-90_hessian_emax-0.5.pkl', 'wb') as f:
+with open('jnkep_initial_fit_data_tree-11_accept-90_hessian_emax-0.5.pkl', 'wb') as f:
     pickle.dump({'jttv': jttv, 'popt': popt, 'param_bounds': param_bounds}, f)
 
 print('Initial fit data saved successfully')
@@ -225,6 +236,6 @@ mcmc.print_summary()
 
 # save results
 import dill
-with open("data/jnkep_fit_k2-19_nburn-1000_nsteps-1000_accept-90_tree-11_hessian_emax-0.5.pkl", "wb") as f:
+with open("jnkep_fit_k2-19_nburn-1000_nsteps-1000_accept-90_tree-11_hessian_emax-0.5.pkl", "wb") as f:
     dill.dump(mcmc, f)
 
